@@ -7,7 +7,7 @@ import tensorflow_datasets as tfds
 import tensorflow_hub as hub
 
 
-class ExampleDataset(tfds.core.GeneratorBasedBuilder):
+class KitIrlRealKitchen(tfds.core.GeneratorBasedBuilder):
     """DatasetBuilder for example dataset."""
 
     VERSION = tfds.core.Version('1.0.0')
@@ -89,23 +89,39 @@ class ExampleDataset(tfds.core.GeneratorBasedBuilder):
 
     def _split_generators(self, dl_manager: tfds.download.DownloadManager):
         """Define data splits."""
+        data_path = "/home/marcelr/uha_test_policy/finetune_data/04_04_2024-15_53_21_0_17_79_banana_from_right_stove_to_sink/signal*.pickle"
         return {
-            'train': self._generate_examples(path='data/train/episode_*.npy'),
-            'val': self._generate_examples(path='data/val/episode_*.npy'),
+            'train': self._generate_examples(path=data_path),
+            # 'val': self._generate_examples(path='data/val/episode_*.npy'),
         }
 
     def _generate_examples(self, path) -> Iterator[Tuple[str, Any]]:
         """Generator of examples for each split."""
 
-        def _parse_example(episode_path):
+        # create list of all examples
+        episode_paths = glob.glob(path)
+
+        # for smallish datasets, use single-thread parsing
+        for sample in episode_paths:
+            yield _parse_example(sample, self._embed)
+
+        # for large datasets use beam to parallelize data parsing (this will have initialization overhead)
+        # beam = tfds.core.lazy_imports.apache_beam
+        # return (
+        #         beam.Create(episode_paths)
+        #         | beam.Map(_parse_example)
+        # )
+
+def _parse_example(episode_path, embed=None):
             # load raw data --> this should change for your dataset
             data = np.load(episode_path, allow_pickle=True)     # this is a list of dicts in our case
+            print(data)
 
             # assemble episode --> here we're assuming demos so we set reward to 1 at the end
             episode = []
             for i, step in enumerate(data):
                 # compute Kona language embedding
-                language_embedding = self._embed([step['language_instruction']])[0].numpy()
+                language_embedding = embed([step['language_instruction']])[0].numpy() if embed is not None else np.zeros(512)
 
                 episode.append({
                     'observation': {
@@ -134,17 +150,10 @@ class ExampleDataset(tfds.core.GeneratorBasedBuilder):
             # if you want to skip an example for whatever reason, simply return None
             return episode_path, sample
 
-        # create list of all examples
-        episode_paths = glob.glob(path)
-
-        # for smallish datasets, use single-thread parsing
-        for sample in episode_paths:
-            yield _parse_example(sample)
-
-        # for large datasets use beam to parallelize data parsing (this will have initialization overhead)
-        # beam = tfds.core.lazy_imports.apache_beam
-        # return (
-        #         beam.Create(episode_paths)
-        #         | beam.Map(_parse_example)
-        # )
-
+if __name__ == "__main__":
+    data_path = "/home/marcelr/uha_test_policy/finetune_data/*"
+    # create list of all examples
+    episode_paths = glob.glob(data_path)
+    for sample in episode_paths:
+        print(sample + "/*")
+        _parse_example(sample + "/*")
