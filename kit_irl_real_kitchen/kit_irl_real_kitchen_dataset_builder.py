@@ -63,8 +63,28 @@ class KitIrlRealKitchen(tfds.core.GeneratorBasedBuilder):
                     'action': tfds.features.Tensor(
                         shape=(10,),
                         dtype=np.float32,
-                        doc='Robot action, consists of [7x joint velocities, '
-                            '2x gripper velocities, 1x terminate episode].',
+                        doc='Delta robot action, consists of [3x delta_end_effector_pos, '
+                            '3x delta_end_effector_ori, 1x des_gripper_width].',
+                    ),
+                    'action_joint_state': tfds.features.Tensor(
+                        shape=(10,),
+                        dtype=np.float32,
+                        doc='Robot action in joint space, consists of [7x joint states]',
+                    ),
+                    'action_joint_vel': tfds.features.Tensor(
+                        shape=(10,),
+                        dtype=np.float32,
+                        doc='Robot action in joint space, consists of [7x joint velocities]',
+                    ),
+                    'action_gripper_width': tfds.features.Tensor(
+                        shape=(10,),
+                        dtype=np.float32,
+                        doc='Desired gripper width, consists of [1x gripper width] in range [0, 1]',
+                    ),
+                    'delta_des_joint_state': tfds.features.Tensor(
+                        shape=(10,),
+                        dtype=np.float32,
+                        doc='Delta robot action in joint space, consists of [7x joint states]',
                     ),
                     'discount': tfds.features.Scalar(
                         dtype=np.float32,
@@ -98,7 +118,8 @@ class KitIrlRealKitchen(tfds.core.GeneratorBasedBuilder):
                 }),
                 'episode_metadata': tfds.features.FeaturesDict({
                     'file_path': tfds.features.Text(
-                        doc='Path to the original data file.'
+                        doc='Path to the original data file.',
+                        traj_length='number of samples in trajectorie'
                     ),
                 }),
             }))
