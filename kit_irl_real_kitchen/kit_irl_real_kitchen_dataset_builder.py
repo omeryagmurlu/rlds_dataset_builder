@@ -36,7 +36,7 @@ class KitIrlRealKitchen(tfds.core.GeneratorBasedBuilder):
                         'wrist_image': tfds.features.Image(
                             shape=(250, 250, 3),
                             dtype=np.uint8,
-                            encoding_format='png',
+                            encoding_format='jpeg',
                             doc='Wrist camera RGB observation.',
                         ),
                         'joint_state': tfds.features.Tensor(
@@ -61,37 +61,36 @@ class KitIrlRealKitchen(tfds.core.GeneratorBasedBuilder):
                         )
                     }),
                     'action': tfds.features.Tensor(
-                        shape=(10,),
-                        dtype=np.float32,
+                        shape=(7,),
+                        dtype=np.float64,
                         doc='Delta robot action, consists of [3x delta_end_effector_pos, '
                             '3x delta_end_effector_ori, 1x des_gripper_width].',
                     ),
                     'action_joint_state': tfds.features.Tensor(
-                        shape=(10,),
-                        dtype=np.float32,
+                        shape=(7,),
+                        dtype=np.float64,
                         doc='Robot action in joint space, consists of [7x joint states]',
                     ),
                     'action_joint_vel': tfds.features.Tensor(
-                        shape=(10,),
-                        dtype=np.float32,
+                        shape=(7,),
+                        dtype=np.float64,
                         doc='Robot action in joint space, consists of [7x joint velocities]',
                     ),
-                    'action_gripper_width': tfds.features.Tensor(
-                        shape=(10,),
-                        dtype=np.float32,
-                        doc='Desired gripper width, consists of [1x gripper width] in range [0, 1]',
-                    ),
                     'delta_des_joint_state': tfds.features.Tensor(
-                        shape=(10,),
-                        dtype=np.float32,
+                        shape=(7,),
+                        dtype=np.float64,
                         doc='Delta robot action in joint space, consists of [7x joint states]',
                     ),
+                    'action_gripper_width': tfds.features.Scalar(
+                        dtype=np.float64,
+                        doc='Desired gripper width, consists of [1x gripper width] in range [0, 1]',
+                    ),
                     'discount': tfds.features.Scalar(
-                        dtype=np.float32,
+                        dtype=np.float64,
                         doc='Discount if provided, default to 1.'
                     ),
                     'reward': tfds.features.Scalar(
-                        dtype=np.float32,
+                        dtype=np.float64,
                         doc='Reward if provided, 1 on final step for demos.'
                     ),
                     'is_first': tfds.features.Scalar(
@@ -109,8 +108,14 @@ class KitIrlRealKitchen(tfds.core.GeneratorBasedBuilder):
                     'language_instruction': tfds.features.Text(
                         doc='Language Instruction.'
                     ),
+                    'language_instruction_2': tfds.features.Text(
+                        doc='Language Instruction.'
+                    ),
+                    'language_instruction_3': tfds.features.Text(
+                        doc='Language Instruction.'
+                    ),
                     'language_embedding': tfds.features.Tensor(
-                        shape=(512,),
+                        shape=(3, 512),
                         dtype=np.float32,
                         doc='Kona language embedding. '
                             'See https://tfhub.dev/google/universal-sentence-encoder-large/5'
@@ -119,14 +124,17 @@ class KitIrlRealKitchen(tfds.core.GeneratorBasedBuilder):
                 'episode_metadata': tfds.features.FeaturesDict({
                     'file_path': tfds.features.Text(
                         doc='Path to the original data file.',
-                        traj_length='number of samples in trajectorie'
                     ),
+                    'traj_length': tfds.features.Scalar(
+                        dtype=np.float64,
+                        doc='Number of samples in trajectorie'
+                    )
                 }),
             }))
 
     def _split_generators(self, dl_manager: tfds.download.DownloadManager):
         """Define data splits."""
-        data_path = "/home/marcelr/uha_test_policy/finetune_data/04_04_2024-15_53_21_0_17_79_banana_from_right_stove_to_sink/signal*.pickle"
+        data_path = "/home/marcelr/uha_test_policy/finetune_data/*"
         return {
             'train': self._generate_examples(path=data_path),
             # 'val': self._generate_examples(path='data/val/episode_*.npy'),
@@ -164,20 +172,13 @@ def _parse_example(episode_path, embed=None):
     cam1_image_vector = create_img_vector(cam1_path, trajectory_length)
     cam2_image_vector = create_img_vector(cam2_path, trajectory_length)
     data.update({'image': cam1_image_vector, 'wrist_image': cam2_image_vector})
-    # print(data.keys())
-    # print(data["image"][0].shape) # (250, 250, 3)
-    # print(data["wrist_image"][0].shape) # (250, 250, 3)
 
     episode = []
     for i in range(trajectory_length):
         # compute Kona language embedding
-        # language_embedding = embed([data['language_instruction']])[0].numpy() if embed is not None else np.zeros(512)
         language_embedding = embed(data['language_description']).numpy() if embed is not None else [np.zeros(512)]
         action = np.append(data['delta_end_effector_pos'][i], data['delta_end_effector_ori'][i], axis=0)
         action = np.append(action, data['des_gripper_width'][i])
-        # action = data['delta_end_effector_pos'][i]
-        # action = action.append(data['delta_end_effector_ori'][i])
-        # action = action.append(data['des_gripper_width'][i])
 
         episode.append({
             'observation': {
@@ -198,7 +199,9 @@ def _parse_example(episode_path, embed=None):
             'is_first': i == 0,
             'is_last': i == (data['traj_length'] - 1),
             'is_terminal': i == (data['traj_length'] - 1),
-            'language_instruction': data['language_description'],
+            'language_instruction': data['language_description'][0],
+            'language_instruction_2': data['language_description'][1],
+            'language_instruction_3': data['language_description'][2],
             'language_embedding': language_embedding,
         })
 
@@ -232,4 +235,4 @@ if __name__ == "__main__":
     episode_paths = glob.glob(data_path)
     for episode in episode_paths:
         _, sample = _parse_example(episode, embed)
-        print(sample)
+        print(sample["steps"][0]["language_instruction_0"])
