@@ -1,6 +1,7 @@
 import os
 import cv2
 from typing import Iterator, Tuple, Any
+from scipy.spatial.transform import Rotation
 
 import glob
 import numpy as np
@@ -57,14 +58,19 @@ class KitIrlRealKitchen(tfds.core.GeneratorBasedBuilder):
                         'end_effector_ori': tfds.features.Tensor(
                             shape=(3,),
                             dtype=np.float64,
-                            doc='Current End Effector orientation in Cartesian space',
+                            doc='Current End Effector orientation in Cartesian space as Euler (xyz)',
+                        ),
+                        'end_effector_ori_quat': tfds.features.Tensor(
+                            shape=(4,),
+                            dtype=np.float64,
+                            doc='Current End Effector orientation in Cartesian space as Quaternion',
                         )
                     }),
                     'action': tfds.features.Tensor(
                         shape=(7,),
                         dtype=np.float64,
                         doc='Delta robot action, consists of [3x delta_end_effector_pos, '
-                            '3x delta_end_effector_ori, 1x des_gripper_width].',
+                            '3x delta_end_effector_ori (euler: roll, pitch, yaw), 1x des_gripper_width].',
                     ),
                     'action_joint_state': tfds.features.Tensor(
                         shape=(7,),
@@ -134,7 +140,8 @@ class KitIrlRealKitchen(tfds.core.GeneratorBasedBuilder):
 
     def _split_generators(self, dl_manager: tfds.download.DownloadManager):
         """Define data splits."""
-        data_path = "/home/marcelr/uha_test_policy/finetune_data/*"
+        # data_path = "/media/irl-admin/93a784d0-a1be-419e-99bd-9b2cd9df02dc1/preprocessed_data/upgraded_lab/upgraded_lab_combined_lang_cutoff_12_04/*"
+        data_path = "/media/irl-admin/93a784d0-a1be-419e-99bd-9b2cd9df02dc1/preprocessed_data/upgraded_lab/quaternions_fixed/lang_annotated_data/*"
         return {
             'train': self._generate_examples(path=data_path),
             # 'val': self._generate_examples(path='data/val/episode_*.npy'),
@@ -177,7 +184,7 @@ def _parse_example(episode_path, embed=None):
     for i in range(trajectory_length):
         # compute Kona language embedding
         language_embedding = embed(data['language_description']).numpy() if embed is not None else [np.zeros(512)]
-        action = np.append(data['delta_end_effector_pos'][i], data['delta_end_effector_ori'][i], axis=0)
+        action = np.append(data['delta_end_effector_pos'][i], Rotation.from_quat(data['delta_end_effector_ori'][i]).as_euler("xyz"), axis=0)
         action = np.append(action, data['des_gripper_width'][i])
 
         episode.append({
@@ -187,7 +194,8 @@ def _parse_example(episode_path, embed=None):
                 'joint_state': data['joint_state'][i],
                 'joint_state_velocity': data['joint_state_velocity'][i],
                 'end_effector_pos': data['end_effector_pos'][i],
-                'end_effector_ori': data['end_effector_ori'][i],
+                'end_effector_ori': Rotation.from_quat(data['end_effector_ori'][i]).as_euler("xyz"),
+                'end_effector_ori_quat': data['end_effector_ori'][i],
             },
             'action': action,
             'action_joint_state': data['des_joint_state'][i],
@@ -229,7 +237,8 @@ def create_img_vector(img_folder_path, trajectory_length):
     return cam_list
 
 if __name__ == "__main__":
-    data_path = "/home/marcelr/uha_test_policy/finetune_data/*"
+    # data_path = "/home/marcelr/uha_test_policy/finetune_data/*"
+    data_path = "/media/irl-admin/93a784d0-a1be-419e-99bd-9b2cd9df02dc1/preprocessed_data/upgraded_lab/quaternions_fixed/lang_annotated_data/*"
     embed = hub.load("https://tfhub.dev/google/universal-sentence-encoder-large/5")
     # create list of all examples
     episode_paths = glob.glob(data_path)
