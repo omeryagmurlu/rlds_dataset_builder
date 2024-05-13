@@ -182,9 +182,12 @@ def _parse_example(episode_path, embed=None):
 
     episode = []
     for i in range(trajectory_length):
+        # (w,x,y,z) -> (x,y,z,w)
+        delta_quat = Rotation.from_quat(np.roll(data['delta_end_effector_ori'][i], -1))
+        eef_quat = Rotation.from_quat(np.roll(data['delta_end_effector_ori'][i], -1))
         # compute Kona language embedding
         language_embedding = embed(data['language_description']).numpy() if embed is not None else [np.zeros(512)]
-        action = np.append(data['delta_end_effector_pos'][i], Rotation.from_quat(data['delta_end_effector_ori'][i]).as_euler("xyz"), axis=0)
+        action = np.append(data['delta_end_effector_pos'][i], delta_quat.as_euler("xyz"), axis=0)
         action = np.append(action, data['des_gripper_width'][i])
 
         episode.append({
@@ -194,7 +197,7 @@ def _parse_example(episode_path, embed=None):
                 'joint_state': data['joint_state'][i],
                 'joint_state_velocity': data['joint_state_velocity'][i],
                 'end_effector_pos': data['end_effector_pos'][i],
-                'end_effector_ori': Rotation.from_quat(data['end_effector_ori'][i]).as_euler("xyz"),
+                'end_effector_ori': eef_quat.as_euler("xyz"),
                 'end_effector_ori_quat': data['end_effector_ori'][i],
             },
             'action': action,
@@ -244,4 +247,4 @@ if __name__ == "__main__":
     episode_paths = glob.glob(data_path)
     for episode in episode_paths:
         _, sample = _parse_example(episode, embed)
-        print(sample["steps"][0]["language_instruction_0"])
+        print(sample["steps"][0]["language_instruction"])
