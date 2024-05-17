@@ -10,7 +10,7 @@ import tensorflow_datasets as tfds
 import tensorflow_hub as hub
 
 
-class KitIrlRealKitchenAbs(tfds.core.GeneratorBasedBuilder):
+class KitIrlRealKitchenDesJoint(tfds.core.GeneratorBasedBuilder):
     """DatasetBuilder for example dataset."""
 
     VERSION = tfds.core.Version('1.0.0')
@@ -140,7 +140,7 @@ class KitIrlRealKitchenAbs(tfds.core.GeneratorBasedBuilder):
 
     def _split_generators(self, dl_manager: tfds.download.DownloadManager):
         """Define data splits."""
-        data_path = "/home/marcelr/uha_test_policy/finetune_data/delta_des_joint_state/*"
+        data_path = "/home/marcelr/uha_test_policy/finetune_data/des_joint_state/*"
         # data_path = "/media/irl-admin/93a784d0-a1be-419e-99bd-9b2cd9df02dc1/preprocessed_data/upgraded_lab/upgraded_lab_combined_lang_cutoff_12_04/*"
         # data_path = "/media/irl-admin/93a784d0-a1be-419e-99bd-9b2cd9df02dc1/preprocessed_data/upgraded_lab/quaternions_fixed/lang_annotated_data/*"
         # data_path = "/media/irl-admin/93a784d0-a1be-419e-99bd-9b2cd9df02dc1/preprocessed_data/upgraded_lab/quaternions_fixed/sim_to_polymetis/des_joint_state/*"
@@ -244,7 +244,7 @@ def create_img_vector(img_folder_path, trajectory_length):
     return cam_list
 
 if __name__ == "__main__":
-    data_path = "/home/marcelr/uha_test_policy/finetune_data/delta_des_joint_state/*"
+    data_path = "/home/marcelr/uha_test_policy/finetune_data/des_joint_state/*"
     # data_path = "/media/irl-admin/93a784d0-a1be-419e-99bd-9b2cd9df02dc1/preprocessed_data/upgraded_lab/upgraded_lab_combined_lang_cutoff_12_04/*"
     # data_path = "/media/irl-admin/93a784d0-a1be-419e-99bd-9b2cd9df02dc1/preprocessed_data/upgraded_lab/quaternions_fixed/lang_annotated_data/*"
     # data_path = "/media/irl-admin/93a784d0-a1be-419e-99bd-9b2cd9df02dc1/preprocessed_data/upgraded_lab/quaternions_fixed/sim_to_polymetis/delta_des_joint_state/*"
