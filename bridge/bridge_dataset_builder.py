@@ -176,19 +176,22 @@ def _parse_example(episode_path, embed=None):
                 lang_txt = {"lang.txt": f.read()}
             data.update(lang_txt)
         else:
-            # test = np.load(data_field_full_path, allow_pickle=True)
             data.update({data_field: np.load(data_field_full_path, allow_pickle=True)})
-            # with open(data_field_full_path, 'rb') as f:
-                # data.update(pickle.load(f))
-                # test = pickle.load(f)
 
-    path = os.path.join(episode_path, "*.pickle")
-    for file in glob.glob(path):
-        # Keys contained in .pickle:
-        # 'joint_state', 'joint_state_velocity', 'des_joint_state', 'des_joint_vel', 'end_effector_pos', 'end_effector_ori', 'des_gripper_width', 'delta_joint_state',
-        # 'delta_des_joint_state', 'delta_end_effector_pos', 'delta_end_effector_ori', 'language_description', 'traj_length'
-        pickle_file_path = os.path.join(episode_path, file)
-        data.update(np.load(pickle_file_path, allow_pickle=True))
+    # agent_data.pkl: dict_keys(['traj_ok', 'camera_info', 'term_t', 'stats'])
+    # policy_out.pkl: dict_keys(['actions', 'new_robot_transform', 'delta_robot_transform', 'policy_type'])
+    # obs_dict.pkl  : dict_keys(['joint_effort', 'qpos', 'qvel', 'full_state', 'state', 'desired_state', 'time_stamp', 'eef_transform', 'high_bound', 'low_bound', 'env_done', 't_get_obs', 'task_stage'])
+    # lang.txt      : b'take the silver pot and place it on the top left burner\nconfidence: 1\n'
+    # for key, value in data.items():
+    #     print(key)
+    #     if isinstance(value, list):
+    #         print(value[0].keys())
+    #     elif isinstance(value, dict):
+    #         print(value.keys())
+    #     else:
+    #         print(value)
+    
+
     trajectory_length = data["traj_length"]
     cam1_path = os.path.join(episode_path, "cam_1")
     cam2_path = os.path.join(episode_path, "cam_2")
