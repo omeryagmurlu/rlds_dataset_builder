@@ -2,6 +2,7 @@ import os
 import cv2
 from typing import Iterator, Tuple, Any
 from scipy.spatial.transform import Rotation
+import pickle
 
 import glob
 import numpy as np
@@ -166,8 +167,20 @@ class Bridge(tfds.core.GeneratorBasedBuilder):
 def _parse_example(episode_path, embed=None):
     data = {}
 
-    print(episode_path)
-    return
+    for data_field in os.listdir(episode_path):
+        data_field_full_path = os.path.join(episode_path, data_field)
+        if os.path.isdir(data_field_full_path):
+            print("image")
+        elif data_field == "lang.txt":
+            with open(data_field_full_path, 'rb') as f:
+                lang_txt = {"lang.txt": f.read()}
+            data.update(lang_txt)
+        else:
+            # test = np.load(data_field_full_path, allow_pickle=True)
+            data.update({data_field: np.load(data_field_full_path, allow_pickle=True)})
+            # with open(data_field_full_path, 'rb') as f:
+                # data.update(pickle.load(f))
+                # test = pickle.load(f)
 
     path = os.path.join(episode_path, "*.pickle")
     for file in glob.glob(path):
