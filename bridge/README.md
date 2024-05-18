@@ -1,3 +1,7 @@
+## Additional installations:
+- [rosnumpy](https://pypi.org/project/rosnumpy/)
+- fixed [genpy](https://pypi.org/project/pyros-genpy/)
+
 TODO(example_dataset): Markdown description of your dataset.
 Description is **formatted** as markdown.
 

@@ -170,18 +170,19 @@ def _parse_example(episode_path, embed=None):
     for data_field in os.listdir(episode_path):
         data_field_full_path = os.path.join(episode_path, data_field)
         if os.path.isdir(data_field_full_path):
-            print("image")
+            cam1_image_vector = create_img_vector(data_field_full_path)
+            data.update({data_field: cam1_image_vector})
         elif data_field == "lang.txt":
             with open(data_field_full_path, 'rb') as f:
-                lang_txt = {"lang.txt": f.read()}
+                lang_txt = {"lang": f.read()}
             data.update(lang_txt)
         else:
-            data.update({data_field: np.load(data_field_full_path, allow_pickle=True)})
+            data.update({data_field[:data_field.find(".")]: np.load(data_field_full_path, allow_pickle=True)})
 
-    # agent_data.pkl: dict_keys(['traj_ok', 'camera_info', 'term_t', 'stats'])
-    # policy_out.pkl: dict_keys(['actions', 'new_robot_transform', 'delta_robot_transform', 'policy_type'])
-    # obs_dict.pkl  : dict_keys(['joint_effort', 'qpos', 'qvel', 'full_state', 'state', 'desired_state', 'time_stamp', 'eef_transform', 'high_bound', 'low_bound', 'env_done', 't_get_obs', 'task_stage'])
-    # lang.txt      : b'take the silver pot and place it on the top left burner\nconfidence: 1\n'
+    # agent_data : dict_keys(['traj_ok', 'camera_info', 'term_t', 'stats'])
+    # policy_out : dict_keys(['actions', 'new_robot_transform', 'delta_robot_transform', 'policy_type'])
+    # obs_dict   : dict_keys(['joint_effort', 'qpos', 'qvel', 'full_state', 'state', 'desired_state', 'time_stamp', 'eef_transform', 'high_bound', 'low_bound', 'env_done', 't_get_obs', 'task_stage'])
+    # lang.txt   : b'take the silver pot and place it on the top left burner\nconfidence: 1\n'
     # for key, value in data.items():
     #     print(key)
     #     if isinstance(value, list):
@@ -192,12 +193,7 @@ def _parse_example(episode_path, embed=None):
     #         print(value)
     
 
-    trajectory_length = data["traj_length"]
-    cam1_path = os.path.join(episode_path, "cam_1")
-    cam2_path = os.path.join(episode_path, "cam_2")
-    cam1_image_vector = create_img_vector(cam1_path, trajectory_length)
-    cam2_image_vector = create_img_vector(cam2_path, trajectory_length)
-    data.update({'image': cam1_image_vector, 'wrist_image': cam2_image_vector})
+    trajectory_length = data["agent_data"]["term_t"]
 
     episode = []
     for i in range(trajectory_length):
@@ -248,13 +244,12 @@ def _parse_example(episode_path, embed=None):
     # if you want to skip an example for whatever reason, simply return None
     return episode_path, sample
 
-def create_img_vector(img_folder_path, trajectory_length):        
+def create_img_vector(img_folder_path):        
     cam_list = []
     cam_path_list = []
-    for index in range(trajectory_length):
-        frame_file_name = '{}.jpeg'.format(index)
-        cam_path_list.append(frame_file_name)
-        img_path = os.path.join(img_folder_path, frame_file_name)
+    for img_name in os.listdir(img_folder_path):
+        cam_path_list.append(img_name)
+        img_path = os.path.join(img_folder_path, img_name)
         img_array = cv2.imread(img_path)
         cam_list.append(img_array)
     return cam_list
