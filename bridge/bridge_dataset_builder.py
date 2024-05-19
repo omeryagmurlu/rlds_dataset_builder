@@ -4,7 +4,6 @@ from typing import Iterator, Tuple, Any
 from scipy.spatial.transform import Rotation
 import pickle
 
-import glob
 import numpy as np
 import tensorflow as tf
 import tensorflow_datasets as tfds
@@ -29,42 +28,50 @@ class Bridge(tfds.core.GeneratorBasedBuilder):
             features=tfds.features.FeaturesDict({
                 'steps': tfds.features.Dataset({
                     'observation': tfds.features.FeaturesDict({
-                        'image': tfds.features.Image(
-                            shape=(250, 250, 3),
+                        'depth_0': tfds.features.Image(
+                            shape=(480, 640, 1),
+                            dtype=np.uint8,
+                            encoding_format='png',
+                            doc='image of depth camera or padding 1s, if has_depth_0 is false.',
+                        ),
+                        'image_0': tfds.features.Image(
+                            shape=(480, 640, 3),
                             dtype=np.uint8,
                             encoding_format='jpeg',
-                            doc='Main camera RGB observation.',
+                            doc='image of main camera or padding 1s, if has_image_0 is false.',
                         ),
-                        'wrist_image': tfds.features.Image(
-                            shape=(250, 250, 3),
+                        'image_1': tfds.features.Image(
+                            shape=(480, 640, 3),
                             dtype=np.uint8,
                             encoding_format='jpeg',
-                            doc='Wrist camera RGB observation.',
+                            doc='image of second camera or padding 1s, if has_image_0 is false.',
                         ),
-                        'joint_state': tfds.features.Tensor(
+                        'image_2': tfds.features.Image(
+                            shape=(480, 640, 3),
+                            dtype=np.uint8,
+                            encoding_format='jpeg',
+                            doc='image of third camera or padding 1s, if has_image_0 is false.',
+                        ),
+                        'image_3': tfds.features.Image(
+                            shape=(480, 640, 3),
+                            dtype=np.uint8,
+                            encoding_format='jpeg',
+                            doc='image of forth camera or padding 1s, if has_image_0 is false.',
+                        ),
+                        'state': tfds.features.Tensor(
                             shape=(7,),
                             dtype=np.float64,
-                            doc='Robot joint state. Consists of [7x joint states]',
+                            doc='Robot end-effector state. Consists of [3x pos, 3x orientation (euler: roll, pitch, yaw), 1x gripper width]',
                         ),
-                        'joint_state_velocity': tfds.features.Tensor(
+                        'full_state': tfds.features.Tensor(
                             shape=(7,),
                             dtype=np.float64,
-                            doc='Robot joint velocities. Consists of [7x joint velocities]',
+                            doc='Robot end-effector state. Consists of [3x pos, 3x orientation (euler: roll, pitch, yaw), 1x gripper width]',
                         ),
-                        'end_effector_pos': tfds.features.Tensor(
-                            shape=(3,),
+                        'desired_state': tfds.features.Tensor(
+                            shape=(7,),
                             dtype=np.float64,
-                            doc='Current End Effector position in Cartesian space',
-                        ),
-                        'end_effector_ori': tfds.features.Tensor(
-                            shape=(3,),
-                            dtype=np.float64,
-                            doc='Current End Effector orientation in Cartesian space as Euler (xyz)',
-                        ),
-                        'end_effector_ori_quat': tfds.features.Tensor(
-                            shape=(4,),
-                            dtype=np.float64,
-                            doc='Current End Effector orientation in Cartesian space as Quaternion',
+                            doc='Robot end-effector state. Consists of [3x pos, 3x orientation (euler: roll, pitch, yaw), 1x gripper width]',
                         )
                     }),
                     'action': tfds.features.Tensor(
@@ -73,24 +80,17 @@ class Bridge(tfds.core.GeneratorBasedBuilder):
                         doc='Delta robot action, consists of [3x delta_end_effector_pos, '
                             '3x delta_end_effector_ori (euler: roll, pitch, yaw), 1x des_gripper_width].',
                     ),
-                    'action_joint_state': tfds.features.Tensor(
-                        shape=(7,),
+                    'new_robot_transform': tfds.features.Tensor(
+                        shape=(4, 4),
                         dtype=np.float64,
-                        doc='Robot action in joint space, consists of [7x joint states]',
+                        doc='Field new_robot_transform from bridge dataset, probably some form of quat (x,y,z,w) in second dim'
+                            'no information was given, cant check further'
                     ),
-                    'action_joint_vel': tfds.features.Tensor(
-                        shape=(7,),
+                    'delta_robot_transform': tfds.features.Tensor(
+                        shape=(4, 4),
                         dtype=np.float64,
-                        doc='Robot action in joint space, consists of [7x joint velocities]',
-                    ),
-                    'delta_des_joint_state': tfds.features.Tensor(
-                        shape=(7,),
-                        dtype=np.float64,
-                        doc='Delta robot action in joint space, consists of [7x joint states]',
-                    ),
-                    'action_gripper_width': tfds.features.Scalar(
-                        dtype=np.float64,
-                        doc='Desired gripper width, consists of [1x gripper width] in range [0, 1]',
+                        doc='Field delta_robot_transform from bridge dataset, probably some form of quat (x,y,z,w) in second dim'
+                            'no information was given, cant check further'
                     ),
                     'discount': tfds.features.Scalar(
                         dtype=np.float64,
@@ -113,20 +113,14 @@ class Bridge(tfds.core.GeneratorBasedBuilder):
                         doc='True on last step of the episode if it is a terminal step, True for demos.'
                     ),
                     'language_instruction': tfds.features.Text(
-                        doc='Language Instruction.'
-                    ),
-                    'language_instruction_2': tfds.features.Text(
-                        doc='Language Instruction.'
-                    ),
-                    'language_instruction_3': tfds.features.Text(
-                        doc='Language Instruction.'
+                        doc='Language Instruction. uint8 encoded data from files, might need to be filtered (containes newline \n)'
                     ),
                     'language_embedding': tfds.features.Tensor(
-                        shape=(3, 512),
+                        shape=(1, 512),
                         dtype=np.float32,
                         doc='Kona language embedding. '
                             'See https://tfhub.dev/google/universal-sentence-encoder-large/5'
-                    ),
+                    )
                 }),
                 'episode_metadata': tfds.features.FeaturesDict({
                     'file_path': tfds.features.Text(
@@ -135,13 +129,37 @@ class Bridge(tfds.core.GeneratorBasedBuilder):
                     'traj_length': tfds.features.Scalar(
                         dtype=np.float64,
                         doc='Number of samples in trajectorie'
+                    ),
+                    'has_depth_0': tfds.features.Scalar(
+                        dtype=np.bool_,
+                        doc='bool, true if dataset had a depth img, false if none (padding 1s in depth_0)'
+                    ),
+                    'has_image_0': tfds.features.Scalar(
+                        dtype=np.bool_,
+                        doc='bool, true if dataset had an img_0, false if none (padding 1s in image_0)'
+                    ),
+                    'has_image_1': tfds.features.Scalar(
+                        dtype=np.bool_,
+                        doc='bool, true if dataset had an img_1, false if none (padding 1s in image_1)'
+                    ),
+                    'has_image_2': tfds.features.Scalar(
+                        dtype=np.bool_,
+                        doc='bool, true if dataset had an img_2, false if none (padding 1s in image_2)'
+                    ),
+                    'has_image_3': tfds.features.Scalar(
+                        dtype=np.bool_,
+                        doc='bool, true if dataset had an img_3, false if none (padding 1s in image_3)'
+                    ),
+                    'has_language': tfds.features.Scalar(
+                        dtype=np.bool_,
+                        doc='bool, true if dataset had language annotations, false if none (empty string in language_instruction as padding)'
                     )
                 }),
             }))
 
     def _split_generators(self, dl_manager: tfds.download.DownloadManager):
         """Define data splits."""
-        data_path = "/home/marcelr/uha_test_policy/finetune_data/des_joint_state/*"
+        data_path = "/home/marcelr/BridgeData/raw"
         return {
             'train': self._generate_examples(path=data_path),
             # 'val': self._generate_examples(path='data/val/episode_*.npy'),
@@ -188,7 +206,7 @@ def _parse_example(episode_path, embed=None):
         elif data_field == "lang.txt":
             with open(data_field_full_path, 'rb') as f:
                 lang_txt = {"lang": f.read()}
-            data.update(lang_txt)
+                data.update(lang_txt)
         else:
             data.update({data_field[:data_field.find(".")]: np.load(data_field_full_path, allow_pickle=True)})
 
@@ -213,8 +231,8 @@ def _parse_example(episode_path, embed=None):
     has_image_3 = "images3" in data
     has_language = "lang" in data
 
-    pad_img_tensor = tf.ones([480, 640, 3], dtype=data["images0"][0].dtype)
-    pad_depth_tensor = tf.ones([480, 640, 1], dtype=data["images0"][0].dtype)
+    pad_img_tensor = tf.ones([480, 640, 3], dtype=data["images0"][0].dtype).numpy()
+    pad_depth_tensor = tf.ones([480, 640, 1], dtype=data["images0"][0].dtype).numpy()
 
     episode = []
     for i in range(trajectory_length):
@@ -290,6 +308,7 @@ if __name__ == "__main__":
     data_path = "/home/marcelr/BridgeData/raw"
     embed = hub.load("https://tfhub.dev/google/universal-sentence-encoder-large/5")
     raw_dirs = []
+    counter = 0
     get_trajectorie_paths_recursive(data_path, raw_dirs)
     for raw_dir in raw_dirs:
         for traj_group in os.listdir(raw_dir):
@@ -298,7 +317,9 @@ if __name__ == "__main__":
                 for traj_dir in os.listdir(traj_group_full_path):
                     traj_dir_full_path = os.path.join(traj_group_full_path, traj_dir)
                     if os.path.isdir(traj_dir_full_path):
+                        counter += 1
                         _parse_example(traj_dir_full_path, embed)
+                        print(counter)
                     else:
                         print("non dir instead of traj found!")
             else:
