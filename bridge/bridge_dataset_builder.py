@@ -151,11 +151,24 @@ class Bridge(tfds.core.GeneratorBasedBuilder):
         """Generator of examples for each split."""
 
         # create list of all examples
-        episode_paths = glob.glob(path)
+        raw_dirs = []
+        get_trajectorie_paths_recursive(path, raw_dirs)
 
         # for smallish datasets, use single-thread parsing
-        for sample in episode_paths:
-            yield _parse_example(sample, self._embed)
+        for raw_dir in raw_dirs:
+            for traj_group in os.listdir(raw_dir):
+                traj_group_full_path = os.path.join(raw_dir, traj_group)
+                if os.path.isdir(traj_group_full_path):
+                    for traj_dir in os.listdir(traj_group_full_path):
+                        traj_dir_full_path = os.path.join(traj_group_full_path, traj_dir)
+                        if os.path.isdir(traj_dir_full_path):
+                            yield _parse_example(traj_dir_full_path, self._embed)
+                        else:
+                            print("non dir instead of traj found!")
+                            yield traj_dir_full_path, {}
+                else:
+                    print("non dir instead of traj_group found!")
+                    yield traj_group_full_path, {}
 
         # for large datasets use beam to parallelize data parsing (this will have initialization overhead)
         # beam = tfds.core.lazy_imports.apache_beam
@@ -198,22 +211,22 @@ def _parse_example(episode_path, embed=None):
     has_image_1 = "images1" in data
     has_image_2 = "images2" in data
     has_image_3 = "images3" in data
+    has_language = "lang" in data
 
     pad_img_tensor = tf.ones([480, 640, 3], dtype=data["images0"][0].dtype)
     pad_depth_tensor = tf.ones([480, 640, 1], dtype=data["images0"][0].dtype)
 
     episode = []
     for i in range(trajectory_length):
-        state = data["obs_dict"]["state"][i]
-
-        # (w,x,y,z) -> (x,y,z,w)
-        delta_quat = Rotation.from_quat(np.roll(data['delta_end_effector_ori'][i], -1))
-        eef_quat = Rotation.from_quat(np.roll(data['end_effector_ori'][i], -1))
         # compute Kona language embedding
-        language_embedding = embed(data['language_description']).numpy() if embed is not None else [np.zeros(512)]
-        action = np.append(data['delta_end_effector_pos'][i], delta_quat.as_euler("xyz"), axis=0)
-        action = np.append(action, data['des_gripper_width'][i])
-        # action = data['des_joint_state'][i]
+        if embed is None:
+            language_embedding = [np.zeros(512)]
+        elif has_language:
+            lang_str = lang_txt["lang"].decode("utf-8")
+            lang_str = [lang_str[:lang_str.find("\n")]]
+            language_embedding = embed(lang_str).numpy()
+        else:
+            language_embedding = embed("").numpy()
 
         episode.append({
             'observation': {
@@ -222,21 +235,19 @@ def _parse_example(episode_path, embed=None):
                 "image_1": data['images1'][i] if has_image_1 else pad_img_tensor,
                 "image_2": data['images2'][i] if has_image_2 else pad_img_tensor,
                 "image_3": data['images3'][i] if has_image_3 else pad_img_tensor,
-                "state": state,
+                "state": data["obs_dict"]["state"][i],
+                "full_state": data["obs_dict"]["full_state"][i],
+                "desired_state": data["obs_dict"]["desired_state"][i],
             },
-            'action': action,
-            'action_joint_state': data['des_joint_state'][i],
-            'action_joint_vel': data['des_joint_vel'][i],
-            'action_gripper_width': data['des_gripper_width'][i],
-            'delta_des_joint_state': data['delta_des_joint_state'][i],
+            'action': data["policy_out"][i]["actions"],
+            'new_robot_transform': data["policy_out"][i]["new_robot_transform"], # prbl quat, x,y,z,w
+            'delta_robot_transform': data["policy_out"][i]["delta_robot_transform"], # prbl quat, x,y,z,w
             'discount': 1.0,
-            'reward': float(i == (data['traj_length'] - 1)),
+            'reward': float(i == (trajectory_length - 1)),
             'is_first': i == 0,
-            'is_last': i == (data['traj_length'] - 1),
-            'is_terminal': i == (data['traj_length'] - 1),
-            'language_instruction': data['language_description'][0],
-            'language_instruction_2': data['language_description'][1],
-            'language_instruction_3': data['language_description'][2],
+            'is_last': i == (trajectory_length - 1),
+            'is_terminal': i == (trajectory_length - 1),
+            'language_instruction': data['lang'] if has_language else b'',
             'language_embedding': language_embedding,
         })
 
@@ -245,14 +256,20 @@ def _parse_example(episode_path, embed=None):
         'steps': episode,
         'episode_metadata': {
             'file_path': episode_path,
-            'traj_length': data['traj_length'],
+            'traj_length': trajectory_length,
+            'has_depth_0': has_depth_0,
+            'has_image_0': has_image_0,
+            'has_image_1': has_image_1,
+            'has_image_2': has_image_2,
+            'has_image_3': has_image_3,
+            'has_language': has_language,
         }
     }
 
     # if you want to skip an example for whatever reason, simply return None
     return episode_path, sample
 
-def create_img_vector(img_folder_path):        
+def create_img_vector(img_folder_path):
     cam_list = []
     cam_path_list = []
     for img_name in os.listdir(img_folder_path):
