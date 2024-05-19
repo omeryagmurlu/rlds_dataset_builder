@@ -72,6 +72,12 @@ class KitIrlRealKitchenDesJoint(tfds.core.GeneratorBasedBuilder):
                         doc='Delta robot action, consists of [3x delta_end_effector_pos, '
                             '3x delta_end_effector_ori (euler: roll, pitch, yaw), 1x des_gripper_width].',
                     ),
+                    'action_abs': tfds.features.Tensor(
+                        shape=(7,),
+                        dtype=np.float64,
+                        doc='Absolute robot action, consists of [3x delta_end_effector_pos, '
+                            '3x delta_end_effector_ori (euler: roll, pitch, yaw), 1x des_gripper_width].',
+                    ),
                     'action_joint_state': tfds.features.Tensor(
                         shape=(7,),
                         dtype=np.float64,
@@ -187,11 +193,14 @@ def _parse_example(episode_path, embed=None):
     for i in range(trajectory_length):
         # (w,x,y,z) -> (x,y,z,w)
         delta_quat = Rotation.from_quat(np.roll(data['delta_end_effector_ori'][i], -1))
+        abs_quat = Rotation.from_quat(np.roll(data['des_end_effector_ori'][i], -1))
         eef_quat = Rotation.from_quat(np.roll(data['end_effector_ori'][i], -1))
         # compute Kona language embedding
         language_embedding = embed(data['language_description']).numpy() if embed is not None else [np.zeros(512)]
         action = np.append(data['delta_end_effector_pos'][i], delta_quat.as_euler("xyz"), axis=0)
         action = np.append(action, data['des_gripper_width'][i])
+        action_abs = np.append(data['des_end_effector_pos'][i], abs_quat.as_euler("xyz"), axis=0)
+        action_abs = np.append(action_abs, data['des_gripper_width'][i])
         # action = data['des_joint_state'][i]
 
         episode.append({
@@ -205,6 +214,7 @@ def _parse_example(episode_path, embed=None):
                 'end_effector_ori_quat': data['end_effector_ori'][i],
             },
             'action': action,
+            'action_abs': action_abs,
             'action_joint_state': data['des_joint_state'][i],
             'action_joint_vel': data['des_joint_vel'][i],
             'action_gripper_width': data['des_gripper_width'][i],

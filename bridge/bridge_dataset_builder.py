@@ -191,12 +191,21 @@ def _parse_example(episode_path, embed=None):
     #         print(value.keys())
     #     else:
     #         print(value)
-    
 
     trajectory_length = data["agent_data"]["term_t"]
+    has_depth_0 = "depth_images0" in data
+    has_image_0 = "images0" in data
+    has_image_1 = "images1" in data
+    has_image_2 = "images2" in data
+    has_image_3 = "images3" in data
+
+    pad_img_tensor = tf.ones([480, 640, 3], dtype=data["images0"][0].dtype)
+    pad_depth_tensor = tf.ones([480, 640, 1], dtype=data["images0"][0].dtype)
 
     episode = []
     for i in range(trajectory_length):
+        state = data["obs_dict"]["state"][i]
+
         # (w,x,y,z) -> (x,y,z,w)
         delta_quat = Rotation.from_quat(np.roll(data['delta_end_effector_ori'][i], -1))
         eef_quat = Rotation.from_quat(np.roll(data['end_effector_ori'][i], -1))
@@ -208,13 +217,12 @@ def _parse_example(episode_path, embed=None):
 
         episode.append({
             'observation': {
-                'image': data['image'][i],
-                'wrist_image': data['wrist_image'][i],
-                'joint_state': data['joint_state'][i],
-                'joint_state_velocity': data['joint_state_velocity'][i],
-                'end_effector_pos': data['end_effector_pos'][i],
-                'end_effector_ori': eef_quat.as_euler("xyz"),
-                'end_effector_ori_quat': data['end_effector_ori'][i],
+                "depth_0": data['depth_images0'][i] if has_depth_0 else pad_depth_tensor,
+                "image_0": data['images0'][i] if has_image_0 else pad_img_tensor,
+                "image_1": data['images1'][i] if has_image_1 else pad_img_tensor,
+                "image_2": data['images2'][i] if has_image_2 else pad_img_tensor,
+                "image_3": data['images3'][i] if has_image_3 else pad_img_tensor,
+                "state": state,
             },
             'action': action,
             'action_joint_state': data['des_joint_state'][i],

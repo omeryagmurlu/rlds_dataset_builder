@@ -75,7 +75,7 @@ class KitIrlRealKitchenDeltaDesJoint(tfds.core.GeneratorBasedBuilder):
                     'action_abs': tfds.features.Tensor(
                         shape=(7,),
                         dtype=np.float64,
-                        doc='Delta robot action, consists of [3x delta_end_effector_pos, '
+                        doc='Absolute robot action, consists of [3x delta_end_effector_pos, '
                             '3x delta_end_effector_ori (euler: roll, pitch, yaw), 1x des_gripper_width].',
                     ),
                     'action_joint_state': tfds.features.Tensor(
