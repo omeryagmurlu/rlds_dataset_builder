@@ -29,7 +29,7 @@ class Bridge(tfds.core.GeneratorBasedBuilder):
                 'steps': tfds.features.Dataset({
                     'observation': tfds.features.FeaturesDict({
                         'depth_0': tfds.features.Image(
-                            shape=(480, 640, 1),
+                            shape=(480, 640, 3),
                             dtype=np.uint8,
                             encoding_format='png',
                             doc='image of depth camera or padding 1s, if has_depth_0 is false.',
@@ -233,7 +233,7 @@ def _parse_example(episode_path, embed=None):
     has_language = "lang" in data
 
     pad_img_tensor = tf.ones([480, 640, 3], dtype=data["images0"][0].dtype).numpy()
-    pad_depth_tensor = tf.ones([480, 640, 1], dtype=data["images0"][0].dtype).numpy()
+    # pad_depth_tensor = tf.ones([480, 640, 1], dtype=data["images0"][0].dtype).numpy()
 
     episode = []
     for i in range(trajectory_length):
@@ -249,7 +249,7 @@ def _parse_example(episode_path, embed=None):
 
         episode.append({
             'observation': {
-                "depth_0": data['depth_images0'][i] if has_depth_0 else pad_depth_tensor,
+                "depth_0": data['depth_images0'][i] if has_depth_0 else pad_img_tensor,
                 "image_0": data['images0'][i] if has_image_0 else pad_img_tensor,
                 "image_1": data['images1'][i] if has_image_1 else pad_img_tensor,
                 "image_2": data['images2'][i] if has_image_2 else pad_img_tensor,
