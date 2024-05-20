@@ -44,19 +44,19 @@ class Bridge(tfds.core.GeneratorBasedBuilder):
                             shape=(480, 640, 3),
                             dtype=np.uint8,
                             encoding_format='jpeg',
-                            doc='image of second camera or padding 1s, if has_image_0 is false.',
+                            doc='image of second camera or padding 1s, if has_image_1 is false.',
                         ),
                         'image_2': tfds.features.Image(
                             shape=(480, 640, 3),
                             dtype=np.uint8,
                             encoding_format='jpeg',
-                            doc='image of third camera or padding 1s, if has_image_0 is false.',
+                            doc='image of third camera or padding 1s, if has_image_2 is false.',
                         ),
                         'image_3': tfds.features.Image(
                             shape=(480, 640, 3),
                             dtype=np.uint8,
                             encoding_format='jpeg',
-                            doc='image of forth camera or padding 1s, if has_image_0 is false.',
+                            doc='image of forth camera or padding 1s, if has_image_3 is false.',
                         ),
                         'state': tfds.features.Tensor(
                             shape=(7,),
@@ -113,7 +113,8 @@ class Bridge(tfds.core.GeneratorBasedBuilder):
                         doc='True on last step of the episode if it is a terminal step, True for demos.'
                     ),
                     'language_instruction': tfds.features.Text(
-                        doc='Language Instruction. uint8 encoded data from files, might need to be filtered (containes newline \n)'
+                        doc='Language Instruction. utf-8 encoded data from files, might need to be filtered (containes newline \n)'
+                            'empty byte stream if has_language is false'
                     ),
                     'language_embedding': tfds.features.Tensor(
                         shape=(1, 512),
@@ -244,7 +245,7 @@ def _parse_example(episode_path, embed=None):
             lang_str = [lang_str[:lang_str.find("\n")]]
             language_embedding = embed(lang_str).numpy()
         else:
-            language_embedding = embed("").numpy()
+            language_embedding = embed([""]).numpy()
 
         episode.append({
             'observation': {
