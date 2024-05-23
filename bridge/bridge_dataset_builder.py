@@ -174,7 +174,11 @@ class Bridge(tfds.core.GeneratorBasedBuilder):
         get_trajectorie_paths_recursive(path, raw_dirs)
 
         # for smallish datasets, use single-thread parsing
+        counter = 0
+        end = len(raw_dirs)
         for raw_dir in raw_dirs:
+            print(counter, " of ", end, " done")
+            counter += 1
             for traj_group in os.listdir(raw_dir):
                 traj_group_full_path = os.path.join(raw_dir, traj_group)
                 if os.path.isdir(traj_group_full_path):
@@ -224,7 +228,11 @@ def _parse_example(episode_path, embed=None):
     #     else:
     #         print(value)
 
-    trajectory_length = data["agent_data"]["term_t"]
+    if not "agent_data" in data:
+        # print for broken trajectories
+        print("no agent_data in: ", episode_path)
+
+    trajectory_length = data["agent_data"]["term_t"] if "agent_data" in data else len(data["policy_out"])
     has_depth_0 = "depth_images0" in data
     has_image_0 = "images0" in data
     has_image_1 = "images1" in data
@@ -232,7 +240,11 @@ def _parse_example(episode_path, embed=None):
     has_image_3 = "images3" in data
     has_language = "lang" in data
 
-    pad_img_tensor = tf.ones([480, 640, 3], dtype=data["images0"][0].dtype).numpy()
+    if has_image_1 and trajectory_length > len(data['images1']):
+        # print for broken trajectories
+        print("Not enough images1 for: ", episode_path)
+
+    pad_img_tensor = tf.ones([480, 640, 3], dtype=np.uint8).numpy()
     # pad_depth_tensor = tf.ones([480, 640, 1], dtype=data["images0"][0].dtype).numpy()
 
     episode = []
@@ -292,10 +304,12 @@ def create_img_vector(img_folder_path):
     cam_list = []
     cam_path_list = []
     for img_name in os.listdir(img_folder_path):
-        cam_path_list.append(img_name)
-        img_path = os.path.join(img_folder_path, img_name)
-        img_array = cv2.imread(img_path)
-        cam_list.append(img_array)
+        ext = img_name[img_name.find("."):]
+        if ext == '.png' or ext == '.jpg' or ext == '.jpeg':
+            cam_path_list.append(img_name)
+            img_path = os.path.join(img_folder_path, img_name)
+            img_array = cv2.imread(img_path)
+            cam_list.append(img_array)
     return cam_list
 
 def get_trajectorie_paths_recursive(directory, sub_dir_list):
