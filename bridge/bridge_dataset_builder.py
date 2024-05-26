@@ -8,7 +8,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_datasets as tfds
 import tensorflow_hub as hub
-
+import re
 
 class Bridge(tfds.core.GeneratorBasedBuilder):
     """DatasetBuilder for example dataset."""
@@ -172,6 +172,7 @@ class Bridge(tfds.core.GeneratorBasedBuilder):
         # create list of all examples
         raw_dirs = []
         get_trajectorie_paths_recursive(path, raw_dirs)
+        raw_dirs.reverse()
 
         # for smallish datasets, use single-thread parsing
         counter = 0
@@ -300,10 +301,16 @@ def _parse_example(episode_path, embed=None):
     # if you want to skip an example for whatever reason, simply return None
     return episode_path, sample
 
+def sorted_alphanumeric(data):
+    convert = lambda text: int(text) if text.isdigit() else text.lower()
+    alphanum_key = lambda key: [ convert(c) for c in re.split('([0-9]+)', key) ] 
+    return sorted(data, key=alphanum_key)
+
 def create_img_vector(img_folder_path):
     cam_list = []
     cam_path_list = []
-    for img_name in os.listdir(img_folder_path):
+    dir_list_sorted = sorted_alphanumeric(os.listdir(img_folder_path))
+    for img_name in dir_list_sorted:
         ext = img_name[img_name.find("."):]
         if ext == '.png' or ext == '.jpg' or ext == '.jpeg':
             cam_path_list.append(img_name)
@@ -325,6 +332,7 @@ if __name__ == "__main__":
     raw_dirs = []
     counter = 0
     get_trajectorie_paths_recursive(data_path, raw_dirs)
+    raw_dirs.reverse() # '/home/marcelr/BridgeData/raw/datacol1_toykitchen1/many_skills/09/2023-03-15_15-11-20/raw' '/home/marcelr/BridgeData/raw/datacol1_toykitchen1/many_skills/09/2023-03-15_15-11-20/raw'
     for raw_dir in raw_dirs:
         for traj_group in os.listdir(raw_dir):
             traj_group_full_path = os.path.join(raw_dir, traj_group)
