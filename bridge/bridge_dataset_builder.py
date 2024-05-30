@@ -160,6 +160,54 @@ class Bridge(tfds.core.GeneratorBasedBuilder):
                         doc='Language Instruction. utf-8 encoded data from files'
                             'empty byte stream if has_language is false'
                     ),
+                    'groundtruth': tfds.features.Text(
+                        doc='Language Instruction. utf-8 encoded data from files'
+                            'empty byte stream if has_language is false'
+                    ),
+                    'groundtruth_1': tfds.features.Text(
+                        doc='Language Instruction. utf-8 encoded data from files'
+                            'empty byte stream if has_language is false'
+                    ),
+                    'groundtruth_2': tfds.features.Text(
+                        doc='Language Instruction. utf-8 encoded data from files'
+                            'empty byte stream if has_language is false'
+                    ),
+                    'groundtruth_3': tfds.features.Text(
+                        doc='Language Instruction. utf-8 encoded data from files'
+                            'empty byte stream if has_language is false'
+                    ),
+                    'groundtruth_4': tfds.features.Text(
+                        doc='Language Instruction. utf-8 encoded data from files'
+                            'empty byte stream if has_language is false'
+                    ),
+                    'groundtruth_5': tfds.features.Text(
+                        doc='Language Instruction. utf-8 encoded data from files'
+                            'empty byte stream if has_language is false'
+                    ),
+                    'groundtruth_6': tfds.features.Text(
+                        doc='Language Instruction. utf-8 encoded data from files'
+                            'empty byte stream if has_language is false'
+                    ),
+                    'groundtruth_7': tfds.features.Text(
+                        doc='Language Instruction. utf-8 encoded data from files'
+                            'empty byte stream if has_language is false'
+                    ),
+                    'groundtruth_8': tfds.features.Text(
+                        doc='Language Instruction. utf-8 encoded data from files'
+                            'empty byte stream if has_language is false'
+                    ),
+                    'groundtruth_9': tfds.features.Text(
+                        doc='Language Instruction. utf-8 encoded data from files'
+                            'empty byte stream if has_language is false'
+                    ),
+                    'groundtruth_10': tfds.features.Text(
+                        doc='Language Instruction. utf-8 encoded data from files'
+                            'empty byte stream if has_language is false'
+                    ),
+                    'groundtruth_11': tfds.features.Text(
+                        doc='Language Instruction. utf-8 encoded data from files'
+                            'empty byte stream if has_language is false'
+                    ),
                     'language_embedding': tfds.features.Tensor(
                         shape=(1, 512),
                         dtype=np.float32,
@@ -252,7 +300,8 @@ def _parse_example(episode_path, embed=None):
 
     # check if "lang_lupus" exists in traj
     lupus_path = os.path.join(episode_path, "annotations", "lang_lupus.txt")
-    if not os.path.isfile(lupus_path):
+    lang_txt_path = os.path.join(episode_path, "lang.txt")
+    if not os.path.isfile(lupus_path) and not os.path.isfile(lang_txt_path):
         return None
 
     for data_field in os.listdir(episode_path):
@@ -268,10 +317,9 @@ def _parse_example(episode_path, embed=None):
                 cam1_image_vector = create_img_vector(data_field_full_path)
                 data.update({data_field: cam1_image_vector})
         elif data_field == "lang.txt":
-            pass
-            # with open(data_field_full_path, 'rb') as f:
-            #     lang_txt = {"lang": f.read()}
-            #     data.update(lang_txt)
+            with open(data_field_full_path, 'rb') as f:
+                lang_txt = {"lang": f.read()}
+                data.update(lang_txt)
         else:
             data.update({data_field[:data_field.find(".")]: np.load(data_field_full_path, allow_pickle=True)})
 
@@ -294,27 +342,24 @@ def _parse_example(episode_path, embed=None):
     has_image_1 = "images1" in data
     has_image_2 = "images2" in data
     has_image_3 = "images3" in data
-    has_language = "lang_lupus" in data # or "lang" in data
+    has_language = "lang_lupus" in data
+    has_groundtruth = "lang" in data
 
     if has_language:
-        lang_str = data["lang_lupus"].decode("utf-8") # data["lang"].decode("utf-8") if "lang" in data else
-        lang_str = lang_str[:lang_str.find("\nconfidence:")]
-        splitted_lang_str = lang_str.find("\n")
-        lang_array = [lang_str[:splitted_lang_str].encode("utf-8")]
-        current_length = 1
-        while splitted_lang_str != -1:
-            splitted_lang_str += 2
-            next_splitted_lang_str = lang_str[splitted_lang_str:].find("\n")
-            if next_splitted_lang_str == -1:
-                break
-            current_length += 1
-            lang_array.append(lang_str[splitted_lang_str-1:splitted_lang_str + next_splitted_lang_str].encode("utf-8"))
-            splitted_lang_str += next_splitted_lang_str
+        lang_str = data["lang_lupus"].decode("utf-8")
+        lupus_array = preprocess_string(lang_str)
+        if len(lupus_array) < 12:
+            to_fill = 12 - len(lupus_array)
+            for i in range(to_fill):
+                lupus_array.append(lupus_array[i])
 
-    if has_language and len(lang_array) < 12:
-        to_fill = 12 - len(lang_array)
-        for i in range(to_fill):
-            lang_array.append(lang_array[i])
+    if has_groundtruth:
+        lang_str = data["lang"].decode("utf-8")
+        lang_array = preprocess_string(lang_str)
+        if len(lang_array) < 12:
+            to_fill = 12 - len(lang_array)
+            for i in range(to_fill):
+                lang_array.append(lang_array[i])
 
     pad_img_tensor = tf.ones([480, 640, 3], dtype=np.uint8).numpy()
     # pad_depth_tensor = tf.ones([480, 640, 1], dtype=data["images0"][0].dtype).numpy()
@@ -325,7 +370,7 @@ def _parse_example(episode_path, embed=None):
         if embed is None:
             language_embedding = [np.zeros(512)]
         elif has_language:
-            lang_str = lang_array[0].decode("utf-8")
+            lang_str = lupus_array[0].decode("utf-8")
             language_embedding = embed([lang_str]).numpy()
         else:
             language_embedding = embed([""]).numpy()
@@ -349,18 +394,30 @@ def _parse_example(episode_path, embed=None):
             'is_first': i == 0,
             'is_last': i == (trajectory_length - 1),
             'is_terminal': i == (trajectory_length - 1),
-            'language_instruction': lang_array[0] if has_language else b'',
-            'language_instruction_1': lang_array[1] if has_language else b'',
-            'language_instruction_2': lang_array[2] if has_language else b'',
-            'language_instruction_3': lang_array[3] if has_language else b'',
-            'language_instruction_4': lang_array[4] if has_language else b'',
-            'language_instruction_5': lang_array[5] if has_language else b'',
-            'language_instruction_6': lang_array[6] if has_language else b'',
-            'language_instruction_7': lang_array[7] if has_language else b'',
-            'language_instruction_8': lang_array[8] if has_language else b'',
-            'language_instruction_9': lang_array[9] if has_language else b'',
-            'language_instruction_10': lang_array[10] if has_language else b'',
-            'language_instruction_11': lang_array[11] if has_language else b'',
+            'language_instruction': lupus_array[0] if has_language else b'',
+            'language_instruction_1': lupus_array[1] if has_language else b'',
+            'language_instruction_2': lupus_array[2] if has_language else b'',
+            'language_instruction_3': lupus_array[3] if has_language else b'',
+            'language_instruction_4': lupus_array[4] if has_language else b'',
+            'language_instruction_5': lupus_array[5] if has_language else b'',
+            'language_instruction_6': lupus_array[6] if has_language else b'',
+            'language_instruction_7': lupus_array[7] if has_language else b'',
+            'language_instruction_8': lupus_array[8] if has_language else b'',
+            'language_instruction_9': lupus_array[9] if has_language else b'',
+            'language_instruction_10': lupus_array[10] if has_language else b'',
+            'language_instruction_11': lupus_array[11] if has_language else b'',
+            'groundtruth': lang_array[0] if has_groundtruth else b'',
+            'groundtruth_1': lang_array[1] if has_groundtruth else b'',
+            'groundtruth_2': lang_array[2] if has_groundtruth else b'',
+            'groundtruth_3': lang_array[3] if has_groundtruth else b'',
+            'groundtruth_4': lang_array[4] if has_groundtruth else b'',
+            'groundtruth_5': lang_array[5] if has_groundtruth else b'',
+            'groundtruth_6': lang_array[6] if has_groundtruth else b'',
+            'groundtruth_7': lang_array[7] if has_groundtruth else b'',
+            'groundtruth_8': lang_array[8] if has_groundtruth else b'',
+            'groundtruth_9': lang_array[9] if has_groundtruth else b'',
+            'groundtruth_10': lang_array[10] if has_groundtruth else b'',
+            'groundtruth_11': lang_array[11] if has_groundtruth else b'',
             'language_embedding': language_embedding,
         })
 
@@ -381,6 +438,22 @@ def _parse_example(episode_path, embed=None):
 
     # if you want to skip an example for whatever reason, simply return None
     return episode_path, sample
+
+def preprocess_string(unfiltered_str: str) -> list:
+    lang_str = unfiltered_str[:unfiltered_str.find("\nconfidence:")]
+    start = 0
+    end = -1
+    lang_array = []
+    while True:
+        end = lang_str[start:].find("\n")
+        if end == -1:
+            if len(lang_str[start:]) != 0:
+                lang_array.append(lang_str[start:].encode("utf-8"))
+            break
+        lang_array.append(lang_str[start:start + end].encode("utf-8"))
+        start += end + 1
+      
+    return lang_array
 
 def sorted_alphanumeric(data):
     convert = lambda text: int(text) if text.isdigit() else text.lower()
