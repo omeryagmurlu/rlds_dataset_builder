@@ -207,14 +207,23 @@ def _parse_example(episode_path, embed=None):
     for data_field in os.listdir(episode_path):
         data_field_full_path = os.path.join(episode_path, data_field)
         if os.path.isdir(data_field_full_path):
-            cam1_image_vector = create_img_vector(data_field_full_path)
-            data.update({data_field: cam1_image_vector})
+            if data_field == "annotations": # extract "lang_lupus"
+                for lupus_annotation in os.listdir(data_field_full_path):
+                    if lupus_annotation == "lang_lupus.txt":
+                        with open(os.path.join(data_field_full_path, lupus_annotation), 'rb') as f:
+                            lang_lupus = {"lang_lupus": f.read()}
+                            data.update(lang_lupus)
+            else:
+                pass
+                # cam1_image_vector = create_img_vector(data_field_full_path)
+                # data.update({data_field: cam1_image_vector})
         elif data_field == "lang.txt":
             with open(data_field_full_path, 'rb') as f:
                 lang_txt = {"lang": f.read()}
                 data.update(lang_txt)
         else:
-            data.update({data_field[:data_field.find(".")]: np.load(data_field_full_path, allow_pickle=True)})
+            # data.update({data_field[:data_field.find(".")]: np.load(data_field_full_path, allow_pickle=True)})
+            pass
 
     # agent_data : dict_keys(['traj_ok', 'camera_info', 'term_t', 'stats'])
     # policy_out : dict_keys(['actions', 'new_robot_transform', 'delta_robot_transform', 'policy_type'])
@@ -229,17 +238,28 @@ def _parse_example(episode_path, embed=None):
     #     else:
     #         print(value)
 
-    if not "agent_data" in data:
-        # print for broken trajectories
-        print("no agent_data in: ", episode_path)
-
     trajectory_length = data["agent_data"]["term_t"] if "agent_data" in data else len(data["policy_out"])
     has_depth_0 = "depth_images0" in data
     has_image_0 = "images0" in data
     has_image_1 = "images1" in data
     has_image_2 = "images2" in data
     has_image_3 = "images3" in data
-    has_language = "lang" in data
+    has_language = "lang" in data or "lang_lupus" in data
+
+    if has_language:
+        lang_str = data["lang"].decode("utf-8") if "lang" in data else data["lang_lupus"].decode("utf-8")
+        lang_str = lang_str[:lang_str.find("\nconfidence:")]
+        splitted_lang_str = lang_str.find("\n")
+        lang_array = [lang_str[:splitted_lang_str]]
+        current_length = 1
+        while splitted_lang_str != -1:
+            splitted_lang_str += 2
+            next_splitted_lang_str = lang_str[splitted_lang_str:].find("\n")
+            if next_splitted_lang_str == -1:
+                break
+            current_length += 1
+            lang_array.append(lang_str[splitted_lang_str-1:splitted_lang_str + next_splitted_lang_str])
+            splitted_lang_str += next_splitted_lang_str
 
     if has_image_1 and trajectory_length > len(data['images1']):
         # print for broken trajectories
@@ -331,6 +351,7 @@ if __name__ == "__main__":
     embed = hub.load("https://tfhub.dev/google/universal-sentence-encoder-large/5")
     raw_dirs = []
     counter = 0
+    current_max_length = 0
     get_trajectorie_paths_recursive(data_path, raw_dirs)
     raw_dirs.reverse() # '/home/marcelr/BridgeData/raw/datacol1_toykitchen1/many_skills/09/2023-03-15_15-11-20/raw' '/home/marcelr/BridgeData/raw/datacol1_toykitchen1/many_skills/09/2023-03-15_15-11-20/raw'
     for raw_dir in raw_dirs:
@@ -347,6 +368,7 @@ if __name__ == "__main__":
                         print("non dir instead of traj found!")
             else:
                 print("non dir instead of traj_group found!")
+    print(current_max_length)
     # create list of all examples
     # episode_paths = glob.glob(data_path)
     # for episode in episode_paths:
