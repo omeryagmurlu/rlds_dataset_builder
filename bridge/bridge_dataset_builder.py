@@ -113,7 +113,51 @@ class Bridge(tfds.core.GeneratorBasedBuilder):
                         doc='True on last step of the episode if it is a terminal step, True for demos.'
                     ),
                     'language_instruction': tfds.features.Text(
-                        doc='Language Instruction. utf-8 encoded data from files, might need to be filtered (containes newline \n)'
+                        doc='Language Instruction. utf-8 encoded data from files'
+                            'empty byte stream if has_language is false'
+                    ),
+                    'language_instruction_1': tfds.features.Text(
+                        doc='Language Instruction. utf-8 encoded data from files'
+                            'empty byte stream if has_language is false'
+                    ),
+                    'language_instruction_2': tfds.features.Text(
+                        doc='Language Instruction. utf-8 encoded data from files'
+                            'empty byte stream if has_language is false'
+                    ),
+                    'language_instruction_3': tfds.features.Text(
+                        doc='Language Instruction. utf-8 encoded data from files'
+                            'empty byte stream if has_language is false'
+                    ),
+                    'language_instruction_4': tfds.features.Text(
+                        doc='Language Instruction. utf-8 encoded data from files'
+                            'empty byte stream if has_language is false'
+                    ),
+                    'language_instruction_5': tfds.features.Text(
+                        doc='Language Instruction. utf-8 encoded data from files'
+                            'empty byte stream if has_language is false'
+                    ),
+                    'language_instruction_6': tfds.features.Text(
+                        doc='Language Instruction. utf-8 encoded data from files'
+                            'empty byte stream if has_language is false'
+                    ),
+                    'language_instruction_7': tfds.features.Text(
+                        doc='Language Instruction. utf-8 encoded data from files'
+                            'empty byte stream if has_language is false'
+                    ),
+                    'language_instruction_8': tfds.features.Text(
+                        doc='Language Instruction. utf-8 encoded data from files'
+                            'empty byte stream if has_language is false'
+                    ),
+                    'language_instruction_9': tfds.features.Text(
+                        doc='Language Instruction. utf-8 encoded data from files'
+                            'empty byte stream if has_language is false'
+                    ),
+                    'language_instruction_10': tfds.features.Text(
+                        doc='Language Instruction. utf-8 encoded data from files'
+                            'empty byte stream if has_language is false'
+                    ),
+                    'language_instruction_11': tfds.features.Text(
+                        doc='Language Instruction. utf-8 encoded data from files'
                             'empty byte stream if has_language is false'
                     ),
                     'language_embedding': tfds.features.Tensor(
@@ -186,7 +230,9 @@ class Bridge(tfds.core.GeneratorBasedBuilder):
                     for traj_dir in os.listdir(traj_group_full_path):
                         traj_dir_full_path = os.path.join(traj_group_full_path, traj_dir)
                         if os.path.isdir(traj_dir_full_path):
-                            yield _parse_example(traj_dir_full_path, self._embed)
+                            example = _parse_example(traj_dir_full_path, self._embed)
+                            if example is not None:
+                                yield example
                         else:
                             print("non dir instead of traj found!")
                             yield traj_dir_full_path, {}
@@ -204,6 +250,11 @@ class Bridge(tfds.core.GeneratorBasedBuilder):
 def _parse_example(episode_path, embed=None):
     data = {}
 
+    # check if "lang_lupus" exists in traj
+    lupus_path = os.path.join(episode_path, "annotations", "lang_lupus.txt")
+    if not os.path.isfile(lupus_path):
+        return None
+
     for data_field in os.listdir(episode_path):
         data_field_full_path = os.path.join(episode_path, data_field)
         if os.path.isdir(data_field_full_path):
@@ -214,16 +265,15 @@ def _parse_example(episode_path, embed=None):
                             lang_lupus = {"lang_lupus": f.read()}
                             data.update(lang_lupus)
             else:
-                pass
-                # cam1_image_vector = create_img_vector(data_field_full_path)
-                # data.update({data_field: cam1_image_vector})
+                cam1_image_vector = create_img_vector(data_field_full_path)
+                data.update({data_field: cam1_image_vector})
         elif data_field == "lang.txt":
-            with open(data_field_full_path, 'rb') as f:
-                lang_txt = {"lang": f.read()}
-                data.update(lang_txt)
-        else:
-            # data.update({data_field[:data_field.find(".")]: np.load(data_field_full_path, allow_pickle=True)})
             pass
+            # with open(data_field_full_path, 'rb') as f:
+            #     lang_txt = {"lang": f.read()}
+            #     data.update(lang_txt)
+        else:
+            data.update({data_field[:data_field.find(".")]: np.load(data_field_full_path, allow_pickle=True)})
 
     # agent_data : dict_keys(['traj_ok', 'camera_info', 'term_t', 'stats'])
     # policy_out : dict_keys(['actions', 'new_robot_transform', 'delta_robot_transform', 'policy_type'])
@@ -244,13 +294,13 @@ def _parse_example(episode_path, embed=None):
     has_image_1 = "images1" in data
     has_image_2 = "images2" in data
     has_image_3 = "images3" in data
-    has_language = "lang" in data or "lang_lupus" in data
+    has_language = "lang_lupus" in data # or "lang" in data
 
     if has_language:
-        lang_str = data["lang"].decode("utf-8") if "lang" in data else data["lang_lupus"].decode("utf-8")
+        lang_str = data["lang_lupus"].decode("utf-8") # data["lang"].decode("utf-8") if "lang" in data else
         lang_str = lang_str[:lang_str.find("\nconfidence:")]
         splitted_lang_str = lang_str.find("\n")
-        lang_array = [lang_str[:splitted_lang_str]]
+        lang_array = [lang_str[:splitted_lang_str].encode("utf-8")]
         current_length = 1
         while splitted_lang_str != -1:
             splitted_lang_str += 2
@@ -258,12 +308,13 @@ def _parse_example(episode_path, embed=None):
             if next_splitted_lang_str == -1:
                 break
             current_length += 1
-            lang_array.append(lang_str[splitted_lang_str-1:splitted_lang_str + next_splitted_lang_str])
+            lang_array.append(lang_str[splitted_lang_str-1:splitted_lang_str + next_splitted_lang_str].encode("utf-8"))
             splitted_lang_str += next_splitted_lang_str
 
-    if has_image_1 and trajectory_length > len(data['images1']):
-        # print for broken trajectories
-        print("Not enough images1 for: ", episode_path)
+    if has_language and len(lang_array) < 12:
+        to_fill = 12 - len(lang_array)
+        for i in range(to_fill):
+            lang_array.append(lang_array[i])
 
     pad_img_tensor = tf.ones([480, 640, 3], dtype=np.uint8).numpy()
     # pad_depth_tensor = tf.ones([480, 640, 1], dtype=data["images0"][0].dtype).numpy()
@@ -274,9 +325,8 @@ def _parse_example(episode_path, embed=None):
         if embed is None:
             language_embedding = [np.zeros(512)]
         elif has_language:
-            lang_str = lang_txt["lang"].decode("utf-8")
-            lang_str = [lang_str[:lang_str.find("\n")]]
-            language_embedding = embed(lang_str).numpy()
+            lang_str = lang_array[0].decode("utf-8")
+            language_embedding = embed([lang_str]).numpy()
         else:
             language_embedding = embed([""]).numpy()
 
@@ -299,7 +349,18 @@ def _parse_example(episode_path, embed=None):
             'is_first': i == 0,
             'is_last': i == (trajectory_length - 1),
             'is_terminal': i == (trajectory_length - 1),
-            'language_instruction': data['lang'] if has_language else b'',
+            'language_instruction': lang_array[0] if has_language else b'',
+            'language_instruction_1': lang_array[1] if has_language else b'',
+            'language_instruction_2': lang_array[2] if has_language else b'',
+            'language_instruction_3': lang_array[3] if has_language else b'',
+            'language_instruction_4': lang_array[4] if has_language else b'',
+            'language_instruction_5': lang_array[5] if has_language else b'',
+            'language_instruction_6': lang_array[6] if has_language else b'',
+            'language_instruction_7': lang_array[7] if has_language else b'',
+            'language_instruction_8': lang_array[8] if has_language else b'',
+            'language_instruction_9': lang_array[9] if has_language else b'',
+            'language_instruction_10': lang_array[10] if has_language else b'',
+            'language_instruction_11': lang_array[11] if has_language else b'',
             'language_embedding': language_embedding,
         })
 
@@ -351,7 +412,6 @@ if __name__ == "__main__":
     embed = hub.load("https://tfhub.dev/google/universal-sentence-encoder-large/5")
     raw_dirs = []
     counter = 0
-    current_max_length = 0
     get_trajectorie_paths_recursive(data_path, raw_dirs)
     raw_dirs.reverse() # '/home/marcelr/BridgeData/raw/datacol1_toykitchen1/many_skills/09/2023-03-15_15-11-20/raw' '/home/marcelr/BridgeData/raw/datacol1_toykitchen1/many_skills/09/2023-03-15_15-11-20/raw'
     for raw_dir in raw_dirs:
@@ -368,7 +428,6 @@ if __name__ == "__main__":
                         print("non dir instead of traj found!")
             else:
                 print("non dir instead of traj_group found!")
-    print(current_max_length)
     # create list of all examples
     # episode_paths = glob.glob(data_path)
     # for episode in episode_paths:
