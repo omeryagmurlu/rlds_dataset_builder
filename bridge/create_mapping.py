@@ -2,10 +2,6 @@ import os
 import csv
 
 
-def add_to_output(dict_reader):
-    output_dict = {}
-
-
 if __name__ == "__main__":
     csv_path = "/home/marcelr/BridgeData"
     output_dict = {}
