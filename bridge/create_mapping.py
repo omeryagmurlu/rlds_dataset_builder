@@ -19,11 +19,11 @@ if __name__ == "__main__":
                 if not row_text["language_instruction_0"] in output_dict:
                     output_dict[row_text["language_instruction_0"]] = []
                 for i in range(15):
-                    if row_lupus["language_instruction_" + str(i)] != "":
+                    if row_lupus["language_instruction_" + str(i)] != "" and not row_lupus["language_instruction_" + str(i)] in output_dict[row_text["language_instruction_0"]]:
                         output_dict[row_text["language_instruction_0"]].append(row_lupus["language_instruction_" + str(i)])
                     else:
                         break
-                    
+
     max_length = 0
     from_label = ""
     for bridge_label, lupus_list in output_dict.items():
@@ -31,6 +31,8 @@ if __name__ == "__main__":
         if curr_length > max_length:
             max_length = curr_length
             from_label = bridge_label
+        if curr_length >= 100:
+            print(bridge_label, " has", curr_length, " lupus labels")
     print("max length: ", max_length, " in label: ", from_label)
 
     with open(os.path.join(csv_path, "mapping.csv"), 'w', newline='') as mapping_csv_file:
