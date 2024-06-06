@@ -7,7 +7,7 @@ from torch import Tensor
 
 MULTIPLIER = 6364136223846793005
 INCREMENT = 1
-MODULUS = 2**64
+MODULUS = 2**32
 
 
 def parse_dir(episode_path, lupus_csv_writer, lang_csv_writer):
@@ -82,7 +82,7 @@ def _reduce_last_axis(x: Tensor) -> Tensor:
         acc *= MULTIPLIER
         acc += INCREMENT
         acc += x[..., i]
-        # acc %= MODULUS  # Not really necessary.
+        acc %= MODULUS  # Not really necessary.
     return acc
 
 def preprocess_string(unfiltered_str: str) -> list:
