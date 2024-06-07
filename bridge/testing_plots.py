@@ -65,6 +65,52 @@ def plot_distribution(dataframe, title, xlabel, ylabel, color, ymax):
 # plot_distribution(bridge_objects_df.head(100), 'Distribution of Default Objects', 'Objects', 'Number of Episodes', 'green', max_objects_count)
 # plot_distribution(bridge_spatial_df.head(200), 'Distribution of Default Spatial Arrangements', 'Spatial Arrangements', 'Number of Episodes', 'red', max_spatial_count)
 
+def add_objects(lupus_df, bridge_df, fig):
+
+    combined_df = lupus_df.merge(bridge_df, on='Object', how='outer', suffixes=('_lupus', '_bridge'))
+    combined_df.fillna(0, inplace=True)
+    combined_df['Total Count'] = combined_df['Count_lupus'] + combined_df['Count_bridge']
+    combined_df['Max Count'] = np.maximum(combined_df['Count_lupus'], combined_df['Count_bridge'])
+    combined_df.sort_values(by='Max Count', ascending=False, inplace=True)
+    fontsize = 21
+    
+    # Calculate ymax dynamically
+    ymax = combined_df[['Count_lupus', 'Count_bridge']].max().max() * 1.1  # Add some padding
+    # Calculate normalized counts for color mapping
+    lupus_counts_norm = combined_df['Count_lupus'] / combined_df['Count_lupus'].max()
+    bridge_counts_norm = combined_df['Count_bridge'] / combined_df['Count_bridge'].max()
+    # Color gradient for lupus (blue), bride (red) based on normalized counts
+    lupus_colors = plt.cm.Blues(0.5 + 0.5 * lupus_counts_norm)
+    bridge_colors = plt.cm.Reds(0.5 + 0.5 * bridge_counts_norm)
+
+    ax2 = fig.add_axes([0.389, 0.51, 0.3, 0.45])
+
+    ax2.bar(np.arange(len(combined_df)), combined_df['Count_lupus'], color=lupus_colors, label='NILS Object')
+    ax2.bar(np.arange(len(combined_df)), combined_df['Count_bridge'], color=bridge_colors, alpha=0.7, label='Bridge Object')
+    
+    ax2.set_ylim(0, 8000)
+    
+    # ax.spines['bottom'].set_visible(False)
+    # ax.spines['right'].set_visible(False)
+    # ax.spines['top'].set_visible(False)
+    ax2.spines['top'].set_visible(False)
+    ax2.spines['right'].set_visible(False)
+    
+    ax2.set_title("Objects", fontsize=fontsize)
+    # ax.tick_params(labelbottom=False)
+    ax2.tick_params(labelbottom=False)
+    ax2.tick_params(bottom=False)
+    # ax.tick_params(bottom=False)
+    # ax.set_yscale('linear')
+    ax2.set_yscale('linear')
+    ax2.set_yticks([0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000])
+    ax2.tick_params(axis='y', labelsize=fontsize - 6)
+
+    ax2.set_xticks(np.arange(len(combined_df)))
+    # ax2.set_xticklabels(combined_df['Spatial Relation'], rotation=60, ha='right' ,fontsize=fontsize)
+    ax2.set_xlim(-0.5, len(combined_df) - 0.5)  # Adjust xlim to reduce space
+
+
 # plot_combined_spatial_distribution(lupus_df, bridge_df, title, xlabel, ylabel):
 def add_spatial(lupus_df, bridge_df, fig):
     combined_df = lupus_df.merge(bridge_df, on='Spatial Relation', how='outer', suffixes=('_lupus', '_bridge'))
@@ -83,7 +129,7 @@ def add_spatial(lupus_df, bridge_df, fig):
     lupus_colors = plt.cm.Blues(0.5 + 0.9 * lupus_counts_norm * 0.5)
     bridge_colors = plt.cm.Reds(0.5 + 0.9 * bridge_counts_norm * 0.5)
 
-    ax2 = fig.add_axes([0.65, 0.49, 0.3, 0.45])
+    ax2 = fig.add_axes([0.699, 0.51, 0.3, 0.45])
     # ax = ax2.twinx()
     # fig, (ax, ax2) = plt.subplots(2, 1, sharex=True, figsize=(24, 12), gridspec_kw={'height_ratios': [1, 2]})
     bars1 = ax2.bar(np.arange(len(combined_df)), combined_df['Count_lupus'], color=lupus_colors, label='NILS Spatial Relation')
@@ -178,6 +224,7 @@ def plot_combined_tasks_with_spatial(lupus_df, bridge_df, title, xlabel, ylabel,
     ax2.set_xticklabels(combined_df['Task'], rotation=60, ha='right', fontsize=xtick_fontsize)
 
     # Inset plot for bridge data
+    add_objects(objects_df.head(60), bridge_objects_df.head(60), fig)
     add_spatial(spatial_df.head(60), bridge_spatial_df.head(60), fig)
     # inset_ax = fig.add_axes([0.65, 0.55, 0.3, 0.4])
     # inset_ax.bar(bridge_df.iloc[:, 0], bridge_df.iloc[:, 1], color=color)
