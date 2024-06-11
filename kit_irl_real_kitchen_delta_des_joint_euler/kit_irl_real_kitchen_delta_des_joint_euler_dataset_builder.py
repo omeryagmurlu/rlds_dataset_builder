@@ -5,11 +5,12 @@ from scipy.spatial.transform import Rotation
 
 import glob
 import numpy as np
+import tensorflow as tf
 import tensorflow_datasets as tfds
 import tensorflow_hub as hub
 
 
-class KitIrlRealKitchenDeltaJointEuler(tfds.core.GeneratorBasedBuilder):
+class KitIrlRealKitchenDeltaDesJointEuler(tfds.core.GeneratorBasedBuilder):
     """DatasetBuilder for example dataset."""
 
     VERSION = tfds.core.Version('1.0.0')
@@ -145,8 +146,8 @@ class KitIrlRealKitchenDeltaJointEuler(tfds.core.GeneratorBasedBuilder):
 
     def _split_generators(self, dl_manager: tfds.download.DownloadManager):
         """Define data splits."""
-        data_path = "/home/marcelr/uha_test_policy/finetune_data/delta_joint_state_euler/*"
-        # data_path = "/media/irl-admin/93a784d0-a1be-419e-99bd-9b2cd9df02dc1/preprocessed_data/upgraded_lab/quaternions_fixed/sim_to_polymetis/delta_joint_state_euler/*"
+        data_path = "/home/marcelr/uha_test_policy/finetune_data/delta_des_joint_state_euler/*"
+        # data_path = "/media/irl-admin/93a784d0-a1be-419e-99bd-9b2cd9df02dc1/preprocessed_data/upgraded_lab/quaternions_fixed/sim_to_polymetis/delta_des_joint_state/*"
         return {
             'train': self._generate_examples(path=data_path),
             # 'val': self._generate_examples(path='data/val/episode_*.npy'),
@@ -189,6 +190,10 @@ def _parse_example(episode_path, embed=None):
     for i in range(trajectory_length):
         # compute Kona language embedding
         language_embedding = embed(data['language_description']).numpy() if embed is not None else [np.zeros(512)]
+        # action = np.append(data['delta_end_effector_pos'][i], delta_quat.as_euler("xyz"), axis=0)
+        # action = np.append(action, data['des_gripper_width'][i])
+        # action_abs = np.append(data['des_end_effector_pos'][i], abs_quat.as_euler("xyz"), axis=0)
+        # action_abs = np.append(action_abs, data['des_gripper_width'][i])
         action = np.append(data['delta_end_effector_pos'][i], data['delta_end_effector_ori'][i], axis=0)
         action = np.append(action, data['des_gripper_width'][i])
         action_abs = np.append(data['des_end_effector_pos'][i], data['des_end_effector_ori'][i], axis=0)
@@ -202,8 +207,8 @@ def _parse_example(episode_path, embed=None):
                 'joint_state': data['joint_state'][i],
                 'joint_state_velocity': data['joint_state_velocity'][i],
                 'end_effector_pos': data['end_effector_pos'][i],
-                'end_effector_ori': data['end_effector_ori'][i],
-                'end_effector_ori_quat': Rotation.from_euler("xyz", data['end_effector_ori'][i]).as_quat(),
+                'end_effector_ori': data['end_effector_ori'][i], # eef_quat.as_euler("xyz"),
+                'end_effector_ori_quat': Rotation.from_euler("xyz", data['end_effector_ori'][i]).as_quat(), # data['end_effector_ori'][i],
             },
             'action': action,
             'action_abs': action_abs,
@@ -234,20 +239,20 @@ def _parse_example(episode_path, embed=None):
     # if you want to skip an example for whatever reason, simply return None
     return episode_path, sample
 
-def create_img_vector(img_folder_path, trajectory_length):        
+def create_img_vector(img_folder_path, trajectory_length):
     cam_list = []
     cam_path_list = []
     for index in range(trajectory_length):
         frame_file_name = '{}.jpeg'.format(index)
         cam_path_list.append(frame_file_name)
         img_path = os.path.join(img_folder_path, frame_file_name)
-        img_array = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_RGB2BGR)
+        img_array = cv2.imread(img_path)
         cam_list.append(img_array)
     return cam_list
 
 if __name__ == "__main__":
-    data_path = "/home/marcelr/uha_test_policy/finetune_data/delta_joint_state_euler/*"
-    # data_path = "/media/irl-admin/93a784d0-a1be-419e-99bd-9b2cd9df02dc1/preprocessed_data/upgraded_lab/quaternions_fixed/sim_to_polymetis/delta_joint_state_euler/*"
+    data_path = "/home/marcelr/uha_test_policy/finetune_data/delta_des_joint_state_euler/*"
+    # data_path = "/media/irl-admin/93a784d0-a1be-419e-99bd-9b2cd9df02dc1/preprocessed_data/upgraded_lab/quaternions_fixed/sim_to_polymetis/delta_des_joint_state/*"
     embed = hub.load("https://tfhub.dev/google/universal-sentence-encoder-large/5")
     # create list of all examples
     episode_paths = glob.glob(data_path)
