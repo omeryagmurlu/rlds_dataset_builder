@@ -246,7 +246,7 @@ def create_img_vector(img_folder_path, trajectory_length):
         frame_file_name = '{}.jpeg'.format(index)
         cam_path_list.append(frame_file_name)
         img_path = os.path.join(img_folder_path, frame_file_name)
-        img_array = cv2.imread(img_path)
+        img_array = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_RGB2BGR)
         cam_list.append(img_array)
     return cam_list
 

@@ -13,9 +13,10 @@ import re
 class Bridge(tfds.core.GeneratorBasedBuilder):
     """DatasetBuilder for example dataset."""
 
-    VERSION = tfds.core.Version('1.0.0')
+    VERSION = tfds.core.Version('1.0.1')
     RELEASE_NOTES = {
       '1.0.0': 'Initial release.',
+      '1.0.1': 'Changed BGR to RGB.',
     }
 
     def __init__(self, *args, **kwargs):
@@ -469,7 +470,8 @@ def create_img_vector(img_folder_path):
         if ext == '.png' or ext == '.jpg' or ext == '.jpeg':
             cam_path_list.append(img_name)
             img_path = os.path.join(img_folder_path, img_name)
-            img_array = cv2.imread(img_path)
+            # img_array = cv2.imread(img_path)
+            img_array = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_RGB2BGR)
             cam_list.append(img_array)
     return cam_list
 
