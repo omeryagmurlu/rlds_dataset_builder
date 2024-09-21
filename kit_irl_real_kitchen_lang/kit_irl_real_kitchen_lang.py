@@ -5,11 +5,17 @@ from scipy.spatial.transform import Rotation
 
 import glob
 import numpy as np
+import tensorflow as tf
 import tensorflow_datasets as tfds
 import tensorflow_hub as hub
+from tqdm import tqdm
 
+tf.config.set_visible_devices([], "GPU")
+data_path = "/home/marcelr/rlds_dataset_builder/data/kit_irl_real_kitchen/lang"
+# data_path = "/home/marcelr/uha_test_policy/finetune_data/delta_des_joint_state_euler"
+# data_path = "/media/irl-admin/93a784d0-a1be-419e-99bd-9b2cd9df02dc1/preprocessed_data/upgraded_lab/quaternions_fixed/sim_to_polymetis/delta_des_joint_state"
 
-class KitIrlRealKitchenDeltaJointEuler(tfds.core.GeneratorBasedBuilder):
+class KitIrlRealKitchenLang(tfds.core.GeneratorBasedBuilder):
     """DatasetBuilder for example dataset."""
 
     VERSION = tfds.core.Version('1.0.0')
@@ -27,13 +33,13 @@ class KitIrlRealKitchenDeltaJointEuler(tfds.core.GeneratorBasedBuilder):
             features=tfds.features.FeaturesDict({
                 'steps': tfds.features.Dataset({
                     'observation': tfds.features.FeaturesDict({
-                        'image': tfds.features.Image(
+                        'image_top': tfds.features.Image(
                             shape=(250, 250, 3),
                             dtype=np.uint8,
                             encoding_format='jpeg',
                             doc='Main camera RGB observation.',
                         ),
-                        'wrist_image': tfds.features.Image(
+                        'image_side': tfds.features.Image(
                             shape=(250, 250, 3),
                             dtype=np.uint8,
                             encoding_format='jpeg',
@@ -145,8 +151,6 @@ class KitIrlRealKitchenDeltaJointEuler(tfds.core.GeneratorBasedBuilder):
 
     def _split_generators(self, dl_manager: tfds.download.DownloadManager):
         """Define data splits."""
-        data_path = "/home/marcelr/uha_test_policy/finetune_data/delta_joint_state_euler/*"
-        # data_path = "/media/irl-admin/93a784d0-a1be-419e-99bd-9b2cd9df02dc1/preprocessed_data/upgraded_lab/quaternions_fixed/sim_to_polymetis/delta_joint_state_euler/*"
         return {
             'train': self._generate_examples(path=data_path),
             # 'val': self._generate_examples(path='data/val/episode_*.npy'),
@@ -156,10 +160,12 @@ class KitIrlRealKitchenDeltaJointEuler(tfds.core.GeneratorBasedBuilder):
         """Generator of examples for each split."""
 
         # create list of all examples
-        episode_paths = glob.glob(path)
+        raw_dirs = []
+        get_trajectorie_paths_recursive(data_path, raw_dirs)
+        print("# of trajectories:", len(raw_dirs))
 
         # for smallish datasets, use single-thread parsing
-        for sample in episode_paths:
+        for sample in raw_dirs:
             yield _parse_example(sample, self._embed)
 
         # for large datasets use beam to parallelize data parsing (this will have initialization overhead)
@@ -189,6 +195,10 @@ def _parse_example(episode_path, embed=None):
     for i in range(trajectory_length):
         # compute Kona language embedding
         language_embedding = embed(data['language_description']).numpy() if embed is not None else [np.zeros(512)]
+        # action = np.append(data['delta_end_effector_pos'][i], delta_quat.as_euler("xyz"), axis=0)
+        # action = np.append(action, data['des_gripper_width'][i])
+        # action_abs = np.append(data['des_end_effector_pos'][i], abs_quat.as_euler("xyz"), axis=0)
+        # action_abs = np.append(action_abs, data['des_gripper_width'][i])
         action = np.append(data['delta_end_effector_pos'][i], data['delta_end_effector_ori'][i], axis=0)
         action = np.append(action, data['des_gripper_width'][i])
         action_abs = np.append(data['des_end_effector_pos'][i], data['des_end_effector_ori'][i], axis=0)
@@ -197,13 +207,13 @@ def _parse_example(episode_path, embed=None):
 
         episode.append({
             'observation': {
-                'image': data['image'][i],
-                'wrist_image': data['wrist_image'][i],
+                'image_top': data['image'][i],
+                'image_side': data['wrist_image'][i],
                 'joint_state': data['joint_state'][i],
                 'joint_state_velocity': data['joint_state_velocity'][i],
                 'end_effector_pos': data['end_effector_pos'][i],
-                'end_effector_ori': data['end_effector_ori'][i],
-                'end_effector_ori_quat': Rotation.from_euler("xyz", data['end_effector_ori'][i]).as_quat(),
+                'end_effector_ori': data['end_effector_ori'][i], # eef_quat.as_euler("xyz"),
+                'end_effector_ori_quat': Rotation.from_euler("xyz", data['end_effector_ori'][i]).as_quat(), # data['end_effector_ori'][i],
             },
             'action': action,
             'action_abs': action_abs,
@@ -234,7 +244,7 @@ def _parse_example(episode_path, embed=None):
     # if you want to skip an example for whatever reason, simply return None
     return episode_path, sample
 
-def create_img_vector(img_folder_path, trajectory_length):        
+def create_img_vector(img_folder_path, trajectory_length):
     cam_list = []
     cam_path_list = []
     for index in range(trajectory_length):
@@ -245,12 +255,17 @@ def create_img_vector(img_folder_path, trajectory_length):
         cam_list.append(img_array)
     return cam_list
 
+def get_trajectorie_paths_recursive(directory, sub_dir_list):
+    for entry in os.listdir(directory):
+        full_path = os.path.join(directory, entry)
+        if os.path.isdir(full_path):
+            sub_dir_list.append(directory) if entry == "cam_1" else get_trajectorie_paths_recursive(full_path, sub_dir_list)
+
 if __name__ == "__main__":
-    data_path = "/home/marcelr/uha_test_policy/finetune_data/delta_joint_state_euler/*"
-    # data_path = "/media/irl-admin/93a784d0-a1be-419e-99bd-9b2cd9df02dc1/preprocessed_data/upgraded_lab/quaternions_fixed/sim_to_polymetis/delta_joint_state_euler/*"
     embed = hub.load("https://tfhub.dev/google/universal-sentence-encoder-large/5")
     # create list of all examples
-    episode_paths = glob.glob(data_path)
-    for episode in episode_paths:
-        _, sample = _parse_example(episode, embed)
-        print(sample["steps"][0]["language_instruction"])
+    raw_dirs = []
+    get_trajectorie_paths_recursive(data_path, raw_dirs)
+    for trajectorie_path in tqdm(raw_dirs):
+        _, sample = _parse_example(trajectorie_path, embed)
+        # print(sample)
