@@ -5,13 +5,17 @@ from scipy.spatial.transform import Rotation
 
 import glob
 import numpy as np
+import natsort
 import tensorflow as tf
 import tensorflow_datasets as tfds
 import tensorflow_hub as hub
 from tqdm import tqdm
+import torch
+from pathlib import Path
 
 tf.config.set_visible_devices([], "GPU")
-data_path = "/home/marcelr/rlds_dataset_builder/data/kit_irl_real_kitchen/lang"
+#data_path = "/run/user/1000040/gvfs/ftp:host=nas-irl.local/home/normal_rel_robot_data"
+data_path = "/home/shilber/rlds_conversion_test"
 # data_path = "/home/marcelr/uha_test_policy/finetune_data/delta_des_joint_state_euler"
 # data_path = "/media/irl-admin/93a784d0-a1be-419e-99bd-9b2cd9df02dc1/preprocessed_data/upgraded_lab/quaternions_fixed/sim_to_polymetis/delta_des_joint_state"
 
@@ -33,17 +37,29 @@ class KitIrlRealKitchenLang(tfds.core.GeneratorBasedBuilder):
             features=tfds.features.FeaturesDict({
                 'steps': tfds.features.Dataset({
                     'observation': tfds.features.FeaturesDict({
-                        'image_top': tfds.features.Image(
-                            shape=(250, 250, 3),
+                        'image_front': tfds.features.Image(
+                            shape=(512, 512, 3),
                             dtype=np.uint8,
-                            encoding_format='jpeg',
-                            doc='Main camera RGB observation.',
+                            encoding_format='png',
+                            doc='Front camera RGB observation.',
                         ),
-                        'image_side': tfds.features.Image(
-                            shape=(250, 250, 3),
+                        'image_top_left': tfds.features.Image(
+                            shape=(512, 512, 3),
                             dtype=np.uint8,
-                            encoding_format='jpeg',
-                            doc='Wrist camera RGB observation.',
+                            encoding_format='png',
+                            doc='Top_left camera RGB observation.',
+                        ),
+                        'image_top_right': tfds.features.Image(
+                            shape=(512, 512, 3),
+                            dtype=np.uint8,
+                            encoding_format='png',
+                            doc='Top_right camera RGB observation.',
+                        ),
+                        'image_wrist': tfds.features.Image(
+                            shape=(512, 512, 3),
+                            dtype=np.uint8,
+                            encoding_format='png',
+                            doc='wrist camera RGB observation.',
                         ),
                         'joint_state': tfds.features.Tensor(
                             shape=(7,),
@@ -122,21 +138,21 @@ class KitIrlRealKitchenLang(tfds.core.GeneratorBasedBuilder):
                         dtype=np.bool_,
                         doc='True on last step of the episode if it is a terminal step, True for demos.'
                     ),
-                    'language_instruction': tfds.features.Text(
-                        doc='Language Instruction.'
-                    ),
-                    'language_instruction_2': tfds.features.Text(
-                        doc='Language Instruction.'
-                    ),
-                    'language_instruction_3': tfds.features.Text(
-                        doc='Language Instruction.'
-                    ),
-                    'language_embedding': tfds.features.Tensor(
-                        shape=(3, 512),
-                        dtype=np.float32,
-                        doc='Kona language embedding. '
-                            'See https://tfhub.dev/google/universal-sentence-encoder-large/5'
-                    ),
+                    # """ 'language_instruction': tfds.features.Text(
+                    #     doc='Language Instruction.'
+                    # ),
+                    # 'language_instruction_2': tfds.features.Text(
+                    #     doc='Language Instruction.'
+                    # ),
+                    # 'language_instruction_3': tfds.features.Text(
+                    #     doc='Language Instruction.'
+                    # ),
+                    # 'language_embedding': tfds.features.Tensor(
+                    #     shape=(3, 512),
+                    #     dtype=np.float32,
+                    #     doc='Kona language embedding. '
+                    #         'See https://tfhub.dev/google/universal-sentence-encoder-large/5'
+                    # ), """
                 }),
                 'episode_metadata': tfds.features.FeaturesDict({
                     'file_path': tfds.features.Text(
@@ -177,59 +193,95 @@ class KitIrlRealKitchenLang(tfds.core.GeneratorBasedBuilder):
 
 def _parse_example(episode_path, embed=None):
     data = {}
-    path = os.path.join(episode_path, "*.pickle")
-    for file in glob.glob(path):
+    leader_path = os.path.join(episode_path, 'p1 leader/*.pt')
+    follower_path = os.path.join(episode_path, 'p3 follower/*.pt')
+    #path = os.path.join(episode_path, "*.pickle")
+    for file in glob.glob(follower_path):
         # Keys contained in .pickle:
         # 'joint_state', 'joint_state_velocity', 'des_joint_state', 'des_joint_vel', 'end_effector_pos', 'end_effector_ori', 'des_gripper_width', 'delta_joint_state',
         # 'delta_des_joint_state', 'delta_end_effector_pos', 'delta_end_effector_ori', 'language_description', 'traj_length'
-        pickle_file_path = os.path.join(episode_path, file)
-        data.update(np.load(pickle_file_path, allow_pickle=True))
-    trajectory_length = data["traj_length"]
-    cam1_path = os.path.join(episode_path, "cam_1")
-    cam2_path = os.path.join(episode_path, "cam_2")
-    cam1_image_vector = create_img_vector(cam1_path, trajectory_length)
-    cam2_image_vector = create_img_vector(cam2_path, trajectory_length)
-    data.update({'image': cam1_image_vector, 'wrist_image': cam2_image_vector})
+        #pt_file_path = os.path.join(episode_path, file)
+        name = Path(file).stem
+        data.update({name : torch.load(file)})
+    for file in glob.glob(leader_path):
+        name = 'des_' + Path(file).stem
+        data.update({name : torch.load(file)})
+    trajectory_length = data[list(data.keys())[0]].size()[0]
+
+    for feature in list(data.keys()):
+        for i in range(len(data[feature])):
+            data[f'delta_{feature}'] = torch.zeros_like(data[feature])
+            if i == 0:
+                data[f'delta_{feature}'][i] = 0
+            else:
+                data[f'delta_{feature}'][i] = data[feature][i] - data[feature][i-1]
+
+
+
+
+
+
+
+
+    front_cam_path = os.path.join(episode_path, 'images/front')
+    top_left_cam_path = os.path.join(episode_path, 'images/top_left')
+    top_right_cam_path = os.path.join(episode_path, 'images/top_right')
+    wrist_cam_path = os.path.join(episode_path, 'images/wrist')
+    front_cam_vector = create_img_vector(front_cam_path, trajectory_length)
+    top_left_cam_vector = create_img_vector(top_left_cam_path, trajectory_length)
+    top_right_cam_vector = create_img_vector(top_right_cam_path, trajectory_length)
+    wrist_cam_vector = create_img_vector(wrist_cam_path, trajectory_length)
+    # cam1_image_vector = create_img_vector(cam1_path, trajectory_length)
+    # cam2_image_vector = create_img_vector(cam2_path, trajectory_length)
+    data.update({
+                'image_front': front_cam_vector, 
+                'image_wrist': wrist_cam_vector, 
+                'image_top_left' : top_left_cam_vector, 
+                'image_top_right' : top_right_cam_vector
+                })
 
     episode = []
     for i in range(trajectory_length):
         # compute Kona language embedding
-        language_embedding = embed(data['language_description']).numpy() if embed is not None else [np.zeros(512)]
+        #language_embedding = embed(data['language_description']).numpy() if embed is not None else [np.zeros(512)]
         # action = np.append(data['delta_end_effector_pos'][i], delta_quat.as_euler("xyz"), axis=0)
         # action = np.append(action, data['des_gripper_width'][i])
         # action_abs = np.append(data['des_end_effector_pos'][i], abs_quat.as_euler("xyz"), axis=0)
         # action_abs = np.append(action_abs, data['des_gripper_width'][i])
-        action = np.append(data['delta_end_effector_pos'][i], data['delta_end_effector_ori'][i], axis=0)
-        action = np.append(action, data['des_gripper_width'][i])
-        action_abs = np.append(data['des_end_effector_pos'][i], data['des_end_effector_ori'][i], axis=0)
-        action_abs = np.append(action_abs, data['des_gripper_width'][i])
+        action = data['delta_ee_pos'][i]
+        action = np.append(action, data['des_gripper_state'][i])
+        action_abs = data['des_ee_pos'][i]
+        action_abs = np.append(action_abs, data['des_gripper_state'][i])
         # action = data['des_joint_state'][i]
 
         episode.append({
             'observation': {
-                'image_top': data['image'][i],
-                'image_side': data['wrist_image'][i],
-                'joint_state': data['joint_state'][i],
-                'joint_state_velocity': data['joint_state_velocity'][i],
-                'end_effector_pos': data['end_effector_pos'][i],
-                'end_effector_ori': data['end_effector_ori'][i], # eef_quat.as_euler("xyz"),
-                'end_effector_ori_quat': Rotation.from_euler("xyz", data['end_effector_ori'][i]).as_quat(), # data['end_effector_ori'][i],
+                'image_front': data['image_front'][i],
+                'image_wrist': data['image_wrist'][i],
+                'image_top_right' : data['image_top_right'],
+                'image_top_left' : data['image_top_left'],
+                'joint_state': data['joint_pos'][i],
+                'joint_state_velocity': data['joint_vel'][i],
+                'end_effector_pos': data['ee_pos'][i][:3],
+                'end_effector_ori_quat': data['ee_pos'][i][3:], 
+                'end_effector_ori': Rotation.from_quat(data['ee_pos'][i][3:]).as_euler("xyz"),
             },
             'action': action,
             'action_abs': action_abs,
-            'action_joint_state': data['des_joint_state'][i],
+            'action_joint_state': data['des_joint_pos'][i],
             'action_joint_vel': data['des_joint_vel'][i],
-            'action_gripper_width': data['des_gripper_width'][i],
-            'delta_des_joint_state': data['delta_des_joint_state'][i],
+            'action_gripper_width': data['des_gripper_state'][i],
+            'delta_des_joint_state': data['delta_des_joint_pos'][i],
             'discount': 1.0,
-            'reward': float(i == (data['traj_length'] - 1)),
+            #'reward': float(i == (data['traj_length'] - 1)),
+            'reward': float(i == (trajectory_length - 1)),
             'is_first': i == 0,
-            'is_last': i == (data['traj_length'] - 1),
-            'is_terminal': i == (data['traj_length'] - 1),
-            'language_instruction': data['language_description'][0],
-            'language_instruction_2': data['language_description'][1],
-            'language_instruction_3': data['language_description'][2],
-            'language_embedding': language_embedding,
+            'is_last': i == (trajectory_length - 1),
+            'is_terminal': i == (trajectory_length - 1),
+            # 'language_instruction': data['language_description'][0],
+            # 'language_instruction_2': data['language_description'][1],
+            # 'language_instruction_3': data['language_description'][2],
+            # 'language_embedding': language_embedding,
         })
 
     # create output data sample
@@ -237,7 +289,7 @@ def _parse_example(episode_path, embed=None):
         'steps': episode,
         'episode_metadata': {
             'file_path': episode_path,
-            'traj_length': data['traj_length'],
+            'traj_length': trajectory_length,
         }
     }
 
@@ -246,11 +298,11 @@ def _parse_example(episode_path, embed=None):
 
 def create_img_vector(img_folder_path, trajectory_length):
     cam_list = []
-    cam_path_list = []
-    for index in range(trajectory_length):
-        frame_file_name = '{}.jpeg'.format(index)
-        cam_path_list.append(frame_file_name)
-        img_path = os.path.join(img_folder_path, frame_file_name)
+    img_paths = glob.glob(os.path.join(img_folder_path, '*.png'))
+    img_paths = natsort.natsorted(img_paths)
+    assert len(img_paths)==trajectory_length, "Number of images does not equal trajectory length!"
+
+    for img_path in img_paths:
         img_array = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_RGB2BGR)
         cam_list.append(img_array)
     return cam_list
@@ -259,13 +311,13 @@ def get_trajectorie_paths_recursive(directory, sub_dir_list):
     for entry in os.listdir(directory):
         full_path = os.path.join(directory, entry)
         if os.path.isdir(full_path):
-            sub_dir_list.append(directory) if entry == "cam_1" else get_trajectorie_paths_recursive(full_path, sub_dir_list)
+            sub_dir_list.append(directory) if entry == "images" else get_trajectorie_paths_recursive(full_path, sub_dir_list)
 
 if __name__ == "__main__":
-    embed = hub.load("https://tfhub.dev/google/universal-sentence-encoder-large/5")
+    #embed = hub.load("https://tfhub.dev/google/universal-sentence-encoder-large/5")
     # create list of all examples
     raw_dirs = []
     get_trajectorie_paths_recursive(data_path, raw_dirs)
     for trajectorie_path in tqdm(raw_dirs):
-        _, sample = _parse_example(trajectorie_path, embed)
+        _, sample = _parse_example(trajectorie_path)
         # print(sample)
