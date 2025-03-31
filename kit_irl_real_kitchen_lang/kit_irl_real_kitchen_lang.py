@@ -14,8 +14,9 @@ import torch
 from pathlib import Path
 
 tf.config.set_visible_devices([], "GPU")
-#data_path = "/run/user/1000040/gvfs/ftp:host=nas-irl.local/home/normal_rel_robot_data"
-data_path = "/home/shilber/rlds_conversion_test"
+data_path = "/home/hk-project-sustainebot/ob0961/ws_data/hkfswork/ob0961-data/data/irl_kitchen_test"
+# data_path = "/run/user/1000040/gvfs/ftp:host=nas-irl.local/home/normal_rel_robot_data"
+# data_path = "/home/shilber/rlds_conversion_test"
 # data_path = "/home/marcelr/uha_test_policy/finetune_data/delta_des_joint_state_euler"
 # data_path = "/media/irl-admin/93a784d0-a1be-419e-99bd-9b2cd9df02dc1/preprocessed_data/upgraded_lab/quaternions_fixed/sim_to_polymetis/delta_des_joint_state"
 
@@ -192,9 +193,20 @@ class KitIrlRealKitchenLang(tfds.core.GeneratorBasedBuilder):
         # )
 
 def _parse_example(episode_path, embed=None):
+    # print(f"Processing episode path: {episode_path}")
+    # Processing episode path: /home/hk-project-sustainebot/ob0961/ws_data/hkfswork/ob0961-data/data/irl_kitchen_test/2025_03_25-22_38_59
     data = {}
-    leader_path = os.path.join(episode_path, 'p1 leader/*.pt')
-    follower_path = os.path.join(episode_path, 'p3 follower/*.pt')
+    leader_path = os.path.join(episode_path, 'leader_*.pt')
+    follower_path = os.path.join(episode_path, 'follower_*.pt')
+    # print(f"Leader path: {glob.glob(leader_path)}")
+    # print(f"Follower path: {glob.glob(follower_path)}")
+    # Leader path: ['/home/hk-project-sustainebot/ob0961/ws_data/hkfswork/ob0961-data/data/irl_kitchen_test/2025_03_25-22_38_59/leader_joint_pos.pt', 
+    #               '/home/hk-project-sustainebot/ob0961/ws_data/hkfswork/ob0961-data/data/irl_kitchen_test/2025_03_25-22_38_59/leader_gripper_state.pt']
+    # Follower path: ['/home/hk-project-sustainebot/ob0961/ws_data/hkfswork/ob0961-data/data/irl_kitchen_test/2025_03_25-22_38_59/follower_gripper_state.pt', 
+    #                 '/home/hk-project-sustainebot/ob0961/ws_data/hkfswork/ob0961-data/data/irl_kitchen_test/2025_03_25-22_38_59/follower_joint_vel.pt', 
+    #                 '/home/hk-project-sustainebot/ob0961/ws_data/hkfswork/ob0961-data/data/irl_kitchen_test/2025_03_25-22_38_59/follower_ee_pos.pt', 
+    #                 '/home/hk-project-sustainebot/ob0961/ws_data/hkfswork/ob0961-data/data/irl_kitchen_test/2025_03_25-22_38_59/follower_joint_pos.pt', 
+    #                 '/home/hk-project-sustainebot/ob0961/ws_data/hkfswork/ob0961-data/data/irl_kitchen_test/2025_03_25-22_38_59/follower_ee_vel.pt']
     #path = os.path.join(episode_path, "*.pickle")
     for file in glob.glob(follower_path):
         # Keys contained in .pickle:
@@ -206,6 +218,10 @@ def _parse_example(episode_path, embed=None):
     for file in glob.glob(leader_path):
         name = 'des_' + Path(file).stem
         data.update({name : torch.load(file)})
+    # print("MARC DEBUG START HERE ############################")
+    # print(data.keys())
+    # ['follower_gripper_state', 'follower_joint_vel', 'follower_ee_pos', 'follower_joint_pos', 'follower_ee_vel', 'des_leader_joint_pos', 'des_leader_gripper_state']
+    # every dict entry has the same length
     trajectory_length = data[list(data.keys())[0]].size()[0]
 
     for feature in list(data.keys()):
@@ -217,27 +233,45 @@ def _parse_example(episode_path, embed=None):
                 data[f'delta_{feature}'][i] = data[feature][i] - data[feature][i-1]
 
 
+    # FROM Flower 
+    # also need to check other transforms that are mentioned in moritz readme
+    # "kit_irl_real_kitchen_lang": {
+    #     "image_obs_keys": {"primary": "image_top", "secondary": "image_side", "wrist": None},
+    #     "depth_obs_keys": {"primary": None, "secondary": None, "wrist": None},
+    #     "proprio_encoding": ProprioEncoding.JOINT,
+    #     "action_encoding": ActionEncoding.JOINT_POS,
+    #     "proprio_obs_key": "proprio",  # And this here
+    #     # "data_dir": "/home/marcelr/tensorflow_datasets",
+    #     "data_dir": "/home/hk-project-sustainebot/ob0961/ws_data/hkfswork/ob0961-data/data/flower_datasets",
+    #     "language_key": "language_instruction", # chose "language_instruction*" for all languages texts available,
+    #     # "shuffle": False,
+    # },
 
 
 
-
-
-
-    front_cam_path = os.path.join(episode_path, 'images/front')
-    top_left_cam_path = os.path.join(episode_path, 'images/top_left')
-    top_right_cam_path = os.path.join(episode_path, 'images/top_right')
-    wrist_cam_path = os.path.join(episode_path, 'images/wrist')
-    front_cam_vector = create_img_vector(front_cam_path, trajectory_length)
-    top_left_cam_vector = create_img_vector(top_left_cam_path, trajectory_length)
-    top_right_cam_vector = create_img_vector(top_right_cam_path, trajectory_length)
-    wrist_cam_vector = create_img_vector(wrist_cam_path, trajectory_length)
+    # front_cam_path = os.path.join(episode_path, 'images/front')
+    # top_left_cam_path = os.path.join(episode_path, 'images/top_left')
+    # top_right_cam_path = os.path.join(episode_path, 'images/top_right')
+    # wrist_cam_path = os.path.join(episode_path, 'images/wrist')
+    # front_cam_vector = create_img_vector(front_cam_path, trajectory_length)
+    # top_left_cam_vector = create_img_vector(top_left_cam_path, trajectory_length)
+    # top_right_cam_vector = create_img_vector(top_right_cam_path, trajectory_length)
+    # wrist_cam_vector = create_img_vector(wrist_cam_path, trajectory_length)
     # cam1_image_vector = create_img_vector(cam1_path, trajectory_length)
     # cam2_image_vector = create_img_vector(cam2_path, trajectory_length)
+    top_cam_path = os.path.join(episode_path, 'images/top_cam')
+    side_cam_path = os.path.join(episode_path, 'images/side_cam')
+    top_cam_vector = create_img_vector(top_cam_path, trajectory_length)
+    side_cam_vector = create_img_vector(side_cam_path, trajectory_length)
+    # data.update({
+    #             'image_front': front_cam_vector, 
+    #             'image_wrist': wrist_cam_vector, 
+    #             'image_top_left' : top_left_cam_vector, 
+    #             'image_top_right' : top_right_cam_vector
+    #             })
     data.update({
-                'image_front': front_cam_vector, 
-                'image_wrist': wrist_cam_vector, 
-                'image_top_left' : top_left_cam_vector, 
-                'image_top_right' : top_right_cam_vector
+                'image_top': top_cam_vector, 
+                'image_side': side_cam_vector
                 })
 
     episode = []
@@ -299,7 +333,12 @@ def _parse_example(episode_path, embed=None):
 def create_img_vector(img_folder_path, trajectory_length):
     cam_list = []
     img_paths = glob.glob(os.path.join(img_folder_path, '*.png'))
+    print(f"image path length: {len(img_paths)}")
     img_paths = natsort.natsorted(img_paths)
+    print(f"image folder path: {img_folder_path}")
+    print(f"image path length: {len(img_paths)}")
+    print(f"trajectory length: {trajectory_length}")
+    print(f"trajectory length * 20: {trajectory_length * 20}")
     assert len(img_paths)==trajectory_length, "Number of images does not equal trajectory length!"
 
     for img_path in img_paths:
@@ -320,4 +359,4 @@ if __name__ == "__main__":
     get_trajectorie_paths_recursive(data_path, raw_dirs)
     for trajectorie_path in tqdm(raw_dirs):
         _, sample = _parse_example(trajectorie_path)
-        # print(sample)
+        print(f"sample: {sample}")
