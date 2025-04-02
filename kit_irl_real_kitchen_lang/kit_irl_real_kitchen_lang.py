@@ -14,11 +14,7 @@ import torch
 from pathlib import Path
 
 tf.config.set_visible_devices([], "GPU")
-data_path = "/home/hk-project-sustainebot/ob0961/ws_data/hkfswork/ob0961-data/data/irl_kitchen_test"
-# data_path = "/run/user/1000040/gvfs/ftp:host=nas-irl.local/home/normal_rel_robot_data"
-# data_path = "/home/shilber/rlds_conversion_test"
-# data_path = "/home/marcelr/uha_test_policy/finetune_data/delta_des_joint_state_euler"
-# data_path = "/media/irl-admin/93a784d0-a1be-419e-99bd-9b2cd9df02dc1/preprocessed_data/upgraded_lab/quaternions_fixed/sim_to_polymetis/delta_des_joint_state"
+data_path = "/home/mnikolaus/code/data/collected_data"
 
 class KitIrlRealKitchenLang(tfds.core.GeneratorBasedBuilder):
     """DatasetBuilder for example dataset."""
@@ -38,29 +34,17 @@ class KitIrlRealKitchenLang(tfds.core.GeneratorBasedBuilder):
             features=tfds.features.FeaturesDict({
                 'steps': tfds.features.Dataset({
                     'observation': tfds.features.FeaturesDict({
-                        'image_front': tfds.features.Image(
+                        'image_top': tfds.features.Image(
                             shape=(512, 512, 3),
                             dtype=np.uint8,
                             encoding_format='png',
-                            doc='Front camera RGB observation.',
+                            doc='Main Top camera RGB observation.',
                         ),
-                        'image_top_left': tfds.features.Image(
+                        'image_side': tfds.features.Image(
                             shape=(512, 512, 3),
                             dtype=np.uint8,
                             encoding_format='png',
-                            doc='Top_left camera RGB observation.',
-                        ),
-                        'image_top_right': tfds.features.Image(
-                            shape=(512, 512, 3),
-                            dtype=np.uint8,
-                            encoding_format='png',
-                            doc='Top_right camera RGB observation.',
-                        ),
-                        'image_wrist': tfds.features.Image(
-                            shape=(512, 512, 3),
-                            dtype=np.uint8,
-                            encoding_format='png',
-                            doc='wrist camera RGB observation.',
+                            doc='Side camera RGB observation.',
                         ),
                         'joint_state': tfds.features.Tensor(
                             shape=(7,),
@@ -97,8 +81,8 @@ class KitIrlRealKitchenLang(tfds.core.GeneratorBasedBuilder):
                     'action_abs': tfds.features.Tensor(
                         shape=(7,),
                         dtype=np.float64,
-                        doc='Absolute robot action, consists of [3x delta_end_effector_pos, '
-                            '3x delta_end_effector_ori (euler: roll, pitch, yaw), 1x des_gripper_width].',
+                        doc='Absolute robot action, consists of [3x end_effector_pos, '
+                            '3x end_effector_ori (euler: roll, pitch, yaw), 1x des_gripper_width].',
                     ),
                     'action_joint_state': tfds.features.Tensor(
                         shape=(7,),
@@ -193,121 +177,87 @@ class KitIrlRealKitchenLang(tfds.core.GeneratorBasedBuilder):
         # )
 
 def _parse_example(episode_path, embed=None):
-    # print(f"Processing episode path: {episode_path}")
-    # Processing episode path: /home/hk-project-sustainebot/ob0961/ws_data/hkfswork/ob0961-data/data/irl_kitchen_test/2025_03_25-22_38_59
+
     data = {}
-    leader_path = os.path.join(episode_path, 'leader_*.pt')
-    follower_path = os.path.join(episode_path, 'follower_*.pt')
-    # print(f"Leader path: {glob.glob(leader_path)}")
-    # print(f"Follower path: {glob.glob(follower_path)}")
-    # Leader path: ['/home/hk-project-sustainebot/ob0961/ws_data/hkfswork/ob0961-data/data/irl_kitchen_test/2025_03_25-22_38_59/leader_joint_pos.pt', 
-    #               '/home/hk-project-sustainebot/ob0961/ws_data/hkfswork/ob0961-data/data/irl_kitchen_test/2025_03_25-22_38_59/leader_gripper_state.pt']
-    # Follower path: ['/home/hk-project-sustainebot/ob0961/ws_data/hkfswork/ob0961-data/data/irl_kitchen_test/2025_03_25-22_38_59/follower_gripper_state.pt', 
-    #                 '/home/hk-project-sustainebot/ob0961/ws_data/hkfswork/ob0961-data/data/irl_kitchen_test/2025_03_25-22_38_59/follower_joint_vel.pt', 
-    #                 '/home/hk-project-sustainebot/ob0961/ws_data/hkfswork/ob0961-data/data/irl_kitchen_test/2025_03_25-22_38_59/follower_ee_pos.pt', 
-    #                 '/home/hk-project-sustainebot/ob0961/ws_data/hkfswork/ob0961-data/data/irl_kitchen_test/2025_03_25-22_38_59/follower_joint_pos.pt', 
-    #                 '/home/hk-project-sustainebot/ob0961/ws_data/hkfswork/ob0961-data/data/irl_kitchen_test/2025_03_25-22_38_59/follower_ee_vel.pt']
-    #path = os.path.join(episode_path, "*.pickle")
+    leader_path = os.path.join(episode_path, 'Gello leader/*.pt')
+    follower_path = os.path.join(episode_path, 'Panda 102 follower/*.pt')
+
+    # 'gripper_state.pt' 'ee_vel.pt' 'joint_vel.pt' 'ee_pos.pt' 'joint_pos.pt' (franka panda robot)
     for file in glob.glob(follower_path):
-        # Keys contained in .pickle:
-        # 'joint_state', 'joint_state_velocity', 'des_joint_state', 'des_joint_vel', 'end_effector_pos', 'end_effector_ori', 'des_gripper_width', 'delta_joint_state',
-        # 'delta_des_joint_state', 'delta_end_effector_pos', 'delta_end_effector_ori', 'language_description', 'traj_length'
-        #pt_file_path = os.path.join(episode_path, file)
         name = Path(file).stem
         data.update({name : torch.load(file)})
+    # 'gripper_state.pt' 'joint_pos.pt' (gello)
     for file in glob.glob(leader_path):
         name = 'des_' + Path(file).stem
         data.update({name : torch.load(file)})
-    # print("MARC DEBUG START HERE ############################")
-    # print(data.keys())
-    # ['follower_gripper_state', 'follower_joint_vel', 'follower_ee_pos', 'follower_joint_pos', 'follower_ee_vel', 'des_leader_joint_pos', 'des_leader_gripper_state']
-    # every dict entry has the same length
+    # all data entry should have the same traj length (primary length of tensor)
     trajectory_length = data[list(data.keys())[0]].size()[0]
 
-    for feature in list(data.keys()):
-        for i in range(len(data[feature])):
-            data[f'delta_{feature}'] = torch.zeros_like(data[feature])
-            if i == 0:
-                data[f'delta_{feature}'][i] = 0
-            else:
-                data[f'delta_{feature}'][i] = data[feature][i] - data[feature][i-1]
 
-
-    # FROM Flower 
-    # also need to check other transforms that are mentioned in moritz readme
-    # "kit_irl_real_kitchen_lang": {
-    #     "image_obs_keys": {"primary": "image_top", "secondary": "image_side", "wrist": None},
-    #     "depth_obs_keys": {"primary": None, "secondary": None, "wrist": None},
-    #     "proprio_encoding": ProprioEncoding.JOINT,
-    #     "action_encoding": ActionEncoding.JOINT_POS,
-    #     "proprio_obs_key": "proprio",  # And this here
-    #     # "data_dir": "/home/marcelr/tensorflow_datasets",
-    #     "data_dir": "/home/hk-project-sustainebot/ob0961/ws_data/hkfswork/ob0961-data/data/flower_datasets",
-    #     "language_key": "language_instruction", # chose "language_instruction*" for all languages texts available,
-    #     # "shuffle": False,
-    # },
-
-
-
-    # front_cam_path = os.path.join(episode_path, 'images/front')
-    # top_left_cam_path = os.path.join(episode_path, 'images/top_left')
-    # top_right_cam_path = os.path.join(episode_path, 'images/top_right')
-    # wrist_cam_path = os.path.join(episode_path, 'images/wrist')
-    # front_cam_vector = create_img_vector(front_cam_path, trajectory_length)
-    # top_left_cam_vector = create_img_vector(top_left_cam_path, trajectory_length)
-    # top_right_cam_vector = create_img_vector(top_right_cam_path, trajectory_length)
-    # wrist_cam_vector = create_img_vector(wrist_cam_path, trajectory_length)
-    # cam1_image_vector = create_img_vector(cam1_path, trajectory_length)
-    # cam2_image_vector = create_img_vector(cam2_path, trajectory_length)
-    top_cam_path = os.path.join(episode_path, 'images/top_cam')
-    side_cam_path = os.path.join(episode_path, 'images/side_cam')
+    top_cam_path = os.path.join(episode_path, 'images/top_cam_orig')
+    side_cam_path = os.path.join(episode_path, 'images/side_cam_orig')
     top_cam_vector = create_img_vector(top_cam_path, trajectory_length)
     side_cam_vector = create_img_vector(side_cam_path, trajectory_length)
-    # data.update({
-    #             'image_front': front_cam_vector, 
-    #             'image_wrist': wrist_cam_vector, 
-    #             'image_top_left' : top_left_cam_vector, 
-    #             'image_top_right' : top_right_cam_vector
-    #             })
+
     data.update({
                 'image_top': top_cam_vector, 
                 'image_side': side_cam_vector
                 })
 
     episode = []
+
+    delta_ee_pos = np.zeros((data["ee_pos"].size()[0], 7))
+    delta_des_joint_state = torch.zeros_like(data["des_joint_pos"])
+
     for i in range(trajectory_length):
         # compute Kona language embedding
         #language_embedding = embed(data['language_description']).numpy() if embed is not None else [np.zeros(512)]
-        # action = np.append(data['delta_end_effector_pos'][i], delta_quat.as_euler("xyz"), axis=0)
-        # action = np.append(action, data['des_gripper_width'][i])
-        # action_abs = np.append(data['des_end_effector_pos'][i], abs_quat.as_euler("xyz"), axis=0)
-        # action_abs = np.append(action_abs, data['des_gripper_width'][i])
-        action = data['delta_ee_pos'][i]
-        action = np.append(action, data['des_gripper_state'][i])
-        action_abs = data['des_ee_pos'][i]
-        action_abs = np.append(action_abs, data['des_gripper_state'][i])
-        # action = data['des_joint_state'][i]
+
+        # compute deltas: delta_ee_pos (pos and ori) & delta_des_joint_state
+        if i == 0:
+            delta_ee_pos[i] = 0
+            delta_des_joint_state[i] = 0
+        else:
+            delta_ee_pos[i][0:3] = data["ee_pos"][i][0:3] - data["ee_pos"][i-1][0:3]
+
+            rot_quat = Rotation.from_quat(data["ee_pos"][i][3:])
+            rot_quat_prev = Rotation.from_quat(data["ee_pos"][i-1][3:7])
+            delta_rot = rot_quat * rot_quat_prev.inv()
+            delta_ee_pos[i][3:6] = delta_rot.as_euler("xyz")
+
+            delta_des_joint_state[i] = data["des_joint_pos"][i] - data["des_joint_pos"][i-1]
+
+
+        # compute action 
+        action_pos_ori = delta_ee_pos[i][0:6]
+        action_gripper = data['des_gripper_state'][i]
+        action = np.append(action_pos_ori, action_gripper)
+        # compute action_abs
+        action_abs_pos = data["ee_pos"][i][0:3]
+        action_abs_ori = Rotation.from_quat(data["ee_pos"][i][3:7]).as_euler("xyz")
+        action_abs_gripper = data['des_gripper_state'][i]
+        action_abs = np.concatenate([action_abs_pos, action_abs_ori, [action_abs_gripper]])
+
+        # compute eef orientation
+        end_effector_ori = Rotation.from_quat(data["ee_pos"][i][3:7]).as_euler("xyz")
 
         episode.append({
             'observation': {
-                'image_front': data['image_front'][i],
-                'image_wrist': data['image_wrist'][i],
-                'image_top_right' : data['image_top_right'],
-                'image_top_left' : data['image_top_left'],
+                'image_top': data['image_top'][i],
+                'image_side': data['image_side'][i],
                 'joint_state': data['joint_pos'][i],
                 'joint_state_velocity': data['joint_vel'][i],
-                'end_effector_pos': data['ee_pos'][i][:3],
-                'end_effector_ori_quat': data['ee_pos'][i][3:], 
-                'end_effector_ori': Rotation.from_quat(data['ee_pos'][i][3:]).as_euler("xyz"),
+                'end_effector_pos': data['ee_pos'][i][0:3],
+                'end_effector_ori_quat': data['ee_pos'][i][3:7], 
+                'end_effector_ori': end_effector_ori,
             },
             'action': action,
             'action_abs': action_abs,
             'action_joint_state': data['des_joint_pos'][i],
-            'action_joint_vel': data['des_joint_vel'][i],
+            'action_joint_vel': data['joint_vel'][i], # 'action_joint_vel': data['des_joint_vel'][i],
             'action_gripper_width': data['des_gripper_state'][i],
-            'delta_des_joint_state': data['delta_des_joint_pos'][i],
+            'delta_des_joint_state': delta_des_joint_state[i],
             'discount': 1.0,
-            #'reward': float(i == (data['traj_length'] - 1)),
             'reward': float(i == (trajectory_length - 1)),
             'is_first': i == 0,
             'is_last': i == (trajectory_length - 1),
@@ -333,12 +283,7 @@ def _parse_example(episode_path, embed=None):
 def create_img_vector(img_folder_path, trajectory_length):
     cam_list = []
     img_paths = glob.glob(os.path.join(img_folder_path, '*.png'))
-    print(f"image path length: {len(img_paths)}")
     img_paths = natsort.natsorted(img_paths)
-    print(f"image folder path: {img_folder_path}")
-    print(f"image path length: {len(img_paths)}")
-    print(f"trajectory length: {trajectory_length}")
-    print(f"trajectory length * 20: {trajectory_length * 20}")
     assert len(img_paths)==trajectory_length, "Number of images does not equal trajectory length!"
 
     for img_path in img_paths:
@@ -359,4 +304,4 @@ if __name__ == "__main__":
     get_trajectorie_paths_recursive(data_path, raw_dirs)
     for trajectorie_path in tqdm(raw_dirs):
         _, sample = _parse_example(trajectorie_path)
-        print(f"sample: {sample}")
+        # print(f"sample: {sample}")
