@@ -1,7 +1,7 @@
 import os
 import torch
 
-path = "/home/mnikolaus/code/data/2025_03_31-16_34_01"
+path = "/home/mnikolaus/code/data/collected_data/2025_03_31-16_34_01"
 subfolders = ["Gello leader", "Panda 102 follower", "../"]
 
 for subfolder in subfolders:
