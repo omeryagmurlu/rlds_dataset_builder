@@ -14,7 +14,7 @@ import torch
 from pathlib import Path
 
 tf.config.set_visible_devices([], "GPU")
-data_path = "/home/mnikolaus/code/data/collected_data"
+data_path = "/home/hk-project-sustainebot/ob0961/ws_data/hkfswork/ob0961-data/data/flower_datasets/marc_rlds_test/collected_data"
 
 class KitIrlRealKitchenLang(tfds.core.GeneratorBasedBuilder):
     """DatasetBuilder for example dataset."""
@@ -26,7 +26,7 @@ class KitIrlRealKitchenLang(tfds.core.GeneratorBasedBuilder):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._embed = hub.load("https://tfhub.dev/google/universal-sentence-encoder-large/5")
+        # self._embed = hub.load("https://tfhub.dev/google/universal-sentence-encoder-large/5")
 
     def _info(self) -> tfds.core.DatasetInfo:
         """Dataset metadata (homepage, citation,...)."""
@@ -167,7 +167,7 @@ class KitIrlRealKitchenLang(tfds.core.GeneratorBasedBuilder):
 
         # for smallish datasets, use single-thread parsing
         for sample in raw_dirs:
-            yield _parse_example(sample, self._embed)
+            yield _parse_example(sample)
 
         # for large datasets use beam to parallelize data parsing (this will have initialization overhead)
         # beam = tfds.core.lazy_imports.apache_beam
@@ -194,8 +194,8 @@ def _parse_example(episode_path, embed=None):
     trajectory_length = data[list(data.keys())[0]].size()[0]
 
 
-    top_cam_path = os.path.join(episode_path, 'images/top_cam_orig')
-    side_cam_path = os.path.join(episode_path, 'images/side_cam_orig')
+    top_cam_path = os.path.join(episode_path, 'images/top_cam_processed')
+    side_cam_path = os.path.join(episode_path, 'images/side_cam_processed')
     top_cam_vector = create_img_vector(top_cam_path, trajectory_length)
     side_cam_vector = create_img_vector(side_cam_path, trajectory_length)
 
@@ -210,8 +210,6 @@ def _parse_example(episode_path, embed=None):
     delta_des_joint_state = torch.zeros_like(data["des_joint_pos"])
 
     for i in range(trajectory_length):
-        # compute Kona language embedding
-        #language_embedding = embed(data['language_description']).numpy() if embed is not None else [np.zeros(512)]
 
         # compute deltas: delta_ee_pos (pos and ori) & delta_des_joint_state
         if i == 0:
@@ -282,7 +280,7 @@ def _parse_example(episode_path, embed=None):
 
 def create_img_vector(img_folder_path, trajectory_length):
     cam_list = []
-    img_paths = glob.glob(os.path.join(img_folder_path, '*.png'))
+    img_paths = glob.glob(os.path.join(img_folder_path, '*.jpeg'))
     img_paths = natsort.natsorted(img_paths)
     assert len(img_paths)==trajectory_length, "Number of images does not equal trajectory length!"
 
@@ -298,7 +296,6 @@ def get_trajectorie_paths_recursive(directory, sub_dir_list):
             sub_dir_list.append(directory) if entry == "images" else get_trajectorie_paths_recursive(full_path, sub_dir_list)
 
 if __name__ == "__main__":
-    #embed = hub.load("https://tfhub.dev/google/universal-sentence-encoder-large/5")
     # create list of all examples
     raw_dirs = []
     get_trajectorie_paths_recursive(data_path, raw_dirs)
