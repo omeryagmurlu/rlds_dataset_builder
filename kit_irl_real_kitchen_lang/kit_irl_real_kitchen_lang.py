@@ -35,15 +35,15 @@ class KitIrlRealKitchenLang(tfds.core.GeneratorBasedBuilder):
                 'steps': tfds.features.Dataset({
                     'observation': tfds.features.FeaturesDict({
                         'image_top': tfds.features.Image(
-                            shape=(512, 512, 3),
+                            shape=(250, 250, 3),
                             dtype=np.uint8,
-                            encoding_format='png',
+                            encoding_format='jpeg',
                             doc='Main Top camera RGB observation.',
                         ),
                         'image_side': tfds.features.Image(
-                            shape=(512, 512, 3),
+                            shape=(250, 250, 3),
                             dtype=np.uint8,
-                            encoding_format='png',
+                            encoding_format='jpeg',
                             doc='Side camera RGB observation.',
                         ),
                         'joint_state': tfds.features.Tensor(
@@ -123,21 +123,21 @@ class KitIrlRealKitchenLang(tfds.core.GeneratorBasedBuilder):
                         dtype=np.bool_,
                         doc='True on last step of the episode if it is a terminal step, True for demos.'
                     ),
-                    # """ 'language_instruction': tfds.features.Text(
-                    #     doc='Language Instruction.'
-                    # ),
-                    # 'language_instruction_2': tfds.features.Text(
-                    #     doc='Language Instruction.'
-                    # ),
-                    # 'language_instruction_3': tfds.features.Text(
-                    #     doc='Language Instruction.'
-                    # ),
+                    'language_instruction': tfds.features.Text(
+                        doc='Language Instruction.'
+                    ),
+                    'language_instruction_2': tfds.features.Text(
+                        doc='Language Instruction.'
+                    ),
+                    'language_instruction_3': tfds.features.Text(
+                        doc='Language Instruction.'
+                    ),
                     # 'language_embedding': tfds.features.Tensor(
                     #     shape=(3, 512),
                     #     dtype=np.float32,
                     #     doc='Kona language embedding. '
                     #         'See https://tfhub.dev/google/universal-sentence-encoder-large/5'
-                    # ), """
+                    # ),
                 }),
                 'episode_metadata': tfds.features.FeaturesDict({
                     'file_path': tfds.features.Text(
@@ -260,9 +260,9 @@ def _parse_example(episode_path, embed=None):
             'is_first': i == 0,
             'is_last': i == (trajectory_length - 1),
             'is_terminal': i == (trajectory_length - 1),
-            # 'language_instruction': data['language_description'][0],
-            # 'language_instruction_2': data['language_description'][1],
-            # 'language_instruction_3': data['language_description'][2],
+            'language_instruction': "marc test instruction one",
+            'language_instruction_2': "marc test instruction two",
+            'language_instruction_3': "marc test instruction three",
             # 'language_embedding': language_embedding,
         })
 
