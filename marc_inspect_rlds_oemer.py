@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-file_path = "/home/hk-project-sustainebot/ob0961/ws_data/hkfswork/ob0961-data/data/flower_datasets/marc_rlds_test/kit_irl_real_kitchen_lang/1.0.0kit_irl_real_kitchen_lang-train.tfrecord-00000-of-00016"
+file_path = "/home/mnikolaus/code/data/oemer_rlds/rlds_files/kit_irl_real_kitchen_lang-train.tfrecord-00000-of-00016"
 
 # action_joint_state 0:7
 # joint_state 0:7
