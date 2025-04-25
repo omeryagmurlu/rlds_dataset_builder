@@ -32,6 +32,6 @@ def print_structure(root, indent=0):
         print_structure(path, indent + 2)
 
 
-root_dir = "D:\\Uni\\Masterarbeit"
-cfg_file = "crop_traj.txt"
+root_dir = "/home/hk-project-sustainebot/ob0961/ws_data/hkfswork/ob0961-data/data/marc_collected_data/marc_datasets"
+cfg_file = "/home/hk-project-sustainebot/ob0961/repos/rlds_dataset_builder/marc/preprocess_collected_data/crop_traj.txt"
 print_structure(root_dir)
